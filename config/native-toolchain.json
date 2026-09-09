@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-10",
+  "expoSdk": "57.0.0",
+  "node": {
+    "version": "24.18.0",
+    "minimumForExpoSdk": "22.13.0"
+  },
+  "packageManager": {
+    "name": "npm",
+    "version": "11.16.0",
+    "lockfile": "package-lock.json",
+    "lockfileVersion": 3
+  },
+  "githubRunner": {
+    "label": "macos-26",
+    "architecture": "arm64"
+  },
+  "xcode": {
+    "version": "26.6",
+    "application": "Xcode_26.6.app",
+    "developerDirectory": "/Applications/Xcode_26.6.app/Contents/Developer"
+  },
+  "ruby": {
+    "version": "3.4.10",
+    "management": "runner-provided-version-pinned-in-workflow"
+  },
+  "cocoaPods": {
+    "version": "1.17.0",
+    "management": "exact-version-install-in-native-workflow",
+    "lockfile": "native-locks/ios/Podfile.lock",
+    "resolution": "unresolved-until-first-phase-2-native-build"
+  },
+  "ios": {
+    "deploymentTarget": "18.0",
+    "sdk": "iphoneos",
+    "destination": "generic/platform=iOS",
+    "deviceFamilies": [1, 2]
+  },
+  "cng": {
+    "enabled": true,
+    "generatedDirectoriesCommitted": false,
+    "platforms": ["ios"]
+  },
+  "sources": {
+    "expoSdk": "https://docs.expo.dev/versions/v57.0.0/",
+    "expoAppConfig": "https://docs.expo.dev/versions/v57.0.0/config/app/",
+    "runnerImage": "https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md"
+  }
+}

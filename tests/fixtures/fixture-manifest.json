@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    { "id": "FIX-01", "preparation": "generated-small", "committed": false },
+    { "id": "FIX-02", "preparation": "generated-small", "committed": false },
+    { "id": "FIX-03", "preparation": "generated-small", "committed": false },
+    { "id": "FIX-04", "preparation": "generated-small", "committed": false },
+    { "id": "FIX-05", "preparation": "qpdf-required", "committed": false },
+    { "id": "FIX-06", "preparation": "phase-5-user-prepared", "committed": false },
+    { "id": "FIX-07", "preparation": "phase-5-user-prepared", "committed": false },
+    { "id": "FIX-08", "preparation": "phase-5-rights-cleared-document", "committed": false },
+    { "id": "FIX-09", "preparation": "phase-5-user-prepared", "committed": false },
+    { "id": "FIX-10", "preparation": "committed-synthetic-json", "committed": true }
+  ]
+}

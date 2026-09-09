@@ -1,14 +1,18 @@
 {
   "expo": {
-    "name": "flink",
+    "name": "Flink",
     "slug": "flink",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "flink",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.aioi.flink",
+      "supportsTablet": true,
+      "requireFullScreen": false,
+      "deploymentTarget": "18.0"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +29,13 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/with-flink-ios",
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "launcher"
+        }
+      ],
       [
         "expo-splash-screen",
         {

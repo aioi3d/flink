@@ -2,10 +2,16 @@
   "name": "flink",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": "24.18.0",
+    "npm": "11.16.0"
+  },
   "dependencies": {
     "@expo/ui": "~57.0.17",
     "expo": "~57.0.21",
     "expo-constants": "~57.0.17",
+    "expo-dev-client": "~57.0.18",
     "expo-device": "~57.0.1",
     "expo-font": "~57.0.3",
     "expo-glass-effect": "~57.0.2",
@@ -29,7 +35,10 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "eslint": "9.39.1",
+    "eslint-config-expo": "~57.0.2",
+    "typescript": "~6.0.3",
+    "vitest": "4.1.11"
   },
   "scripts": {
     "start": "expo start",
@@ -37,7 +46,14 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run tests/unit tests/contracts",
+    "verify:config": "node ./scripts/verify-config.mjs",
+    "verify:ci": "node ./scripts/ci/validate-workflows.mjs",
+    "native:signature": "node ./scripts/native-signature.mjs",
+    "native:check": "node ./scripts/native-check.mjs",
+    "verify:local": "node ./scripts/verify-local.mjs"
   },
   "private": true
 }

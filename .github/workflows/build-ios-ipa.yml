@@ -1,0 +1,104 @@
+name: iOS IPA - Phase 1 preflight only
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to validate and eventually build
+        type: string
+        required: true
+      profile:
+        description: Native runtime profile
+        type: choice
+        required: true
+        options:
+          - development
+          - production
+      reason:
+        description: Why this native runtime is requested
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-preflight-${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Validate requested existing tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      FLINK_EVENT_NAME: ${{ github.event_name }}
+      FLINK_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+      FLINK_PROFILE: ${{ github.event_name == 'push' && 'production' || inputs.profile }}
+      FLINK_REASON: ${{ github.event_name == 'push' && 'production tag push' || inputs.reason }}
+      FLINK_GITHUB_REF: ${{ github.ref }}
+      FLINK_BUILD_PROFILE: ${{ github.event_name == 'push' && 'production' || inputs.profile }}
+    steps:
+      - name: Check out workflow source for trusted validation
+        uses: actions/checkout@v6.0.3
+
+      - name: Use pinned Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Validate untrusted inputs before requested checkout
+        run: node scripts/ci/validate-build-inputs.mjs --skip-app-version
+
+      - name: Check out the requested existing tag
+        uses: actions/checkout@v6.0.3
+        with:
+          ref: refs/tags/${{ env.FLINK_TAG }}
+          fetch-depth: 0
+
+      - name: Use pinned npm
+        shell: bash
+        run: |
+          npm install --global npm@11.16.0
+          test "$(npm --version)" = "11.16.0"
+
+      - name: Validate tagged event, tag, profile, reason, and app version
+        run: node scripts/ci/validate-build-inputs.mjs
+
+      - name: Verify tag checkout and record source SHA
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_ref="refs/tags/${FLINK_TAG}"
+          git show-ref --verify "$tag_ref"
+          tag_commit="$(git rev-list -n 1 "$tag_ref")"
+          head_commit="$(git rev-parse HEAD)"
+          if [ "$tag_commit" != "$head_commit" ]; then
+            echo "Checked-out commit does not match the requested tag." >&2
+            exit 1
+          fi
+          printf 'source_sha=%s\n' "$head_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run local preflight checks
+        run: |
+          npm run typecheck
+          npm run test:unit
+          npm run verify:config
+          npm run native:check
+          npm run verify:ci
+
+      - name: Stop before unavailable native build
+        shell: bash
+        run: |
+          echo "FLINK_PHASE_1_NATIVE_BUILD_UNAVAILABLE"
+          echo "Phase 1 validates inputs only. Phase 2 must implement and verify the unsigned device build and Release publication path." >&2
+          exit 1

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "FIX-10",
+  "source": "synthetic",
+  "containsPersonalFaceData": false,
+  "units": {
+    "nativeMs": "monotonic milliseconds",
+    "left": "ARKit-compatible synthetic coefficient from 0 to 1",
+    "right": "ARKit-compatible synthetic coefficient from 0 to 1"
+  },
+  "sequences": [
+    {
+      "name": "bilateral-short-blink",
+      "samples": [
+        { "nativeMs": 0, "left": 0.05, "right": 0.05 },
+        { "nativeMs": 150, "left": 0.05, "right": 0.05 },
+        { "nativeMs": 200, "left": 0.9, "right": 0.9 },
+        { "nativeMs": 280, "left": 0.05, "right": 0.05 }
+      ]
+    },
+    {
+      "name": "left-eye-only",
+      "samples": [
+        { "nativeMs": 0, "left": 0.05, "right": 0.05 },
+        { "nativeMs": 150, "left": 0.05, "right": 0.05 },
+        { "nativeMs": 200, "left": 0.9, "right": 0.05 },
+        { "nativeMs": 280, "left": 0.05, "right": 0.05 }
+      ]
+    }
+  ],
+  "note": "Unit tests add the complete input context, tracking epoch, sequence, and age fields required by DES-BLINK-FSM."
+}
