@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "nativeApiVersion": 1,
-  "nativeRuntimeVersion": "1.0.3",
+  "nativeRuntimeVersion": "1.0.4",
   "signature": {
     "algorithm": "sha256",
     "inputVersion": 1,
@@ -12,7 +12,7 @@
     },
     "resolutionStatus": "unresolved",
     "unresolvedReasons": [
-      "Phase 2 source is implemented, but the macOS native build and resolved Pod lock have not run yet."
+      "The macOS build resolved a Pod lock, but Release publication failed before Podfile.lock and native-build-info.json could be retrieved and recorded locally."
     ]
   },
   "nativePackageAllowlist": [

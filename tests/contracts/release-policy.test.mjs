@@ -10,6 +10,7 @@ import {
   resolveRemoteTagCommit,
   validateReleaseState,
   verifyChecksumManifest,
+  waitForRelease,
 } from '../../scripts/ci/publish-release.mjs';
 
 function ghJson(value) {
@@ -109,25 +110,103 @@ describe('GitHub Release publication policy (TC-D07 and TC-D08)', () => {
     ).rejects.toThrow('network failure');
   });
 
-  it('treats only an explicit 404 as a missing Release', () => {
+  it('finds Draft Releases through the paginated Release inventory', () => {
+    const draft = {
+      tag_name: 'v1.0.0',
+      draft: true,
+      prerelease: false,
+      immutable: false,
+      assets: [],
+    };
+    const calls = [];
+    const execute = (args, options) => {
+      calls.push({ args, options });
+      return ghJson([
+        [{ tag_name: 'v0.9.0', draft: false }],
+        [draft],
+      ]);
+    };
+
+    expect(queryRelease('owner/repository', 'v1.0.0', { execute })).toStrictEqual(draft);
+    expect(calls).toEqual([
+      {
+        args: [
+          'api',
+          '--paginate',
+          '--slurp',
+          'repos/owner/repository/releases?per_page=100',
+        ],
+        options: { allowFailure: true },
+      },
+    ]);
+  });
+
+  it('treats only a successful inventory miss as a missing Release', () => {
     expect(
       queryRelease('owner/repository', 'v1.0.0', {
         allowMissing: true,
-        execute: () => ({ status: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' }),
+        execute: () => ghJson([[]]),
       }),
     ).toBeNull();
     expect(() =>
       queryRelease('owner/repository', 'v1.0.0', {
-        allowMissing: true,
-        execute: () => ({ status: 1, stdout: '', stderr: 'Not Found' }),
+        execute: () => ghJson([[]]),
       }),
-    ).toThrow(/Unable to query/);
+    ).toThrow(/was not found/);
     expect(() =>
       queryRelease('owner/repository', 'v1.0.0', {
         allowMissing: true,
-        execute: () => ({ status: 1, stdout: '', stderr: 'network unavailable' }),
+        execute: () => ({ status: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' }),
       }),
-    ).toThrow(/Unable to query/);
+    ).toThrow(/Unable to list GitHub Releases/);
+  });
+
+  it('rejects malformed or duplicate Release inventories', () => {
+    expect(() =>
+      queryRelease('owner/repository', 'v1.0.0', {
+        execute: () => ghJson([{ tag_name: 'v1.0.0' }]),
+      }),
+    ).toThrow(/invalid paginated response/);
+    expect(() =>
+      queryRelease('owner/repository', 'v1.0.0', {
+        execute: () => ghJson([
+          [{ tag_name: 'v1.0.0' }],
+          [{ tag_name: 'v1.0.0' }],
+        ]),
+      }),
+    ).toThrow(/duplicate Releases/);
+  });
+
+  it('waits for a newly-created Draft to appear without creating it again', async () => {
+    const draft = { tag_name: 'v1.0.0', draft: true };
+    const responses = [null, null, draft];
+    const sleeps = [];
+    const query = (_repository, _tag, options) => {
+      expect(options).toEqual({ allowMissing: true });
+      return responses.shift();
+    };
+
+    await expect(
+      waitForRelease('owner/repository', 'v1.0.0', {
+        attempts: 3,
+        intervalMs: 25,
+        query,
+        sleep: async (milliseconds) => {
+          sleeps.push(milliseconds);
+        },
+      }),
+    ).resolves.toBe(draft);
+    expect(sleeps).toEqual([25, 25]);
+    expect(responses).toHaveLength(0);
+
+    await expect(
+      waitForRelease('owner/repository', 'v1.0.0', {
+        attempts: 2,
+        intervalMs: 0,
+        query: () => null,
+        sleep: async () => {},
+      }),
+    ).rejects.toThrow(/did not appear/);
   });
 
   it('requires SHA256SUMS.txt to describe the exact release payload', async () => {

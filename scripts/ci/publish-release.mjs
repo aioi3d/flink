@@ -42,8 +42,17 @@ function gh(args, { allowFailure = false } = {}) {
     maxBuffer: 32 * 1024 * 1024,
     windowsHide: true,
   });
+  if (result.error) {
+    fail(`GitHub CLI could not start: ${result.error.message}`);
+  }
   if (!allowFailure && result.status !== 0) {
-    fail((result.stderr || result.stdout || `gh exited with ${result.status}`).trim());
+    const action = args[0] === 'api' ? 'API request' : args.slice(0, 2).join(' ');
+    const detail = (
+      result.stderr ||
+      result.stdout ||
+      `gh exited with ${result.status}${result.signal ? ` (${result.signal})` : ''}`
+    ).trim();
+    fail(`GitHub CLI ${action} failed: ${detail}`);
   }
   return result;
 }
@@ -129,17 +138,66 @@ export function queryRelease(
   { allowMissing = false, execute = gh } = {},
 ) {
   const result = execute(
-    ['api', `repos/${repository}/releases/tags/${tag}`],
-    { allowFailure: allowMissing },
+    [
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/${repository}/releases?per_page=100`,
+    ],
+    { allowFailure: true },
   );
-  if (result.status === 0) {
-    return parseGhJson(result, 'GitHub Release query');
+  if (result.status !== 0) {
+    const response = `${result.stderr}\n${result.stdout}`.trim();
+    fail(`Unable to list GitHub Releases: ${response}`);
   }
-  const response = `${result.stderr}\n${result.stdout}`;
-  if (allowMissing && /\bHTTP\s+404\b/i.test(response)) {
+
+  // The release-by-tag endpoint only returns published Releases. Publication
+  // deliberately starts as a Draft, so enumerate the authenticated Release
+  // inventory instead; users with push access receive Drafts in this listing.
+  const pages = parseGhJson(result, 'GitHub Release inventory query');
+  assert(
+    Array.isArray(pages) && pages.every((page) => Array.isArray(page)),
+    'GitHub Release inventory has an invalid paginated response.',
+  );
+  const matches = pages
+    .flat()
+    .filter((release) => release?.tag_name === tag);
+  assert(matches.length <= 1, 'GitHub returned duplicate Releases for the requested tag.');
+  if (matches.length === 0 && allowMissing) {
     return null;
   }
-  fail(`Unable to query the existing Release: ${response.trim()}`);
+  assert(matches.length === 1, `GitHub Release ${tag} was not found.`);
+  return matches[0];
+}
+
+export async function waitForRelease(
+  repository,
+  tag,
+  {
+    attempts = 10,
+    intervalMs = 1_000,
+    query = queryRelease,
+    sleep = (milliseconds) =>
+      new Promise((resolve) => {
+        setTimeout(resolve, milliseconds);
+      }),
+  } = {},
+) {
+  assert(Number.isInteger(attempts) && attempts > 0, 'Release wait attempts are invalid.');
+  assert(
+    Number.isInteger(intervalMs) && intervalMs >= 0,
+    'Release wait interval is invalid.',
+  );
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const release = query(repository, tag, { allowMissing: true });
+    if (release) {
+      return release;
+    }
+    if (attempt < attempts) {
+      await sleep(intervalMs);
+    }
+  }
+  fail(`Draft GitHub Release ${tag} did not appear in the authenticated inventory.`);
 }
 
 export function resolveRemoteTagCommit(repository, tag, execute = gh) {
@@ -316,7 +374,7 @@ async function performPublication(setTemporaryDirectory) {
     createArguments.push('--repo', repository);
     gh(createArguments);
     created = true;
-    release = queryRelease(repository, tag);
+    release = await waitForRelease(repository, tag);
   }
 
   validateReleaseState(release, tag, profile);

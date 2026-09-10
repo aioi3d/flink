@@ -235,11 +235,21 @@ export function validateWorkflowPolicy({
     [/native-build-info\.json/, 'must verify prior build provenance'],
     [/sourceCommit/, 'must reject source drift'],
     [/git\/ref\/tags/, 'must revalidate the remote tag target before publication'],
+    [/releases\?per_page=100/, 'must discover Draft Releases through the authenticated inventory'],
+    [/'--paginate'/, 'must paginate the Release inventory'],
+    [/'--slurp'/, 'must parse paginated Release inventory as one JSON value'],
     [/FLINK_NATIVE_RUNTIME_SIGNATURE/, 'must bind publication to the resolved signature'],
     [/releaseAssetNames/, 'must use the remote asset inventory when downloading'],
   ]) {
     requirePattern(errors, publishScriptText, pattern, `publish-release.mjs: ${message}.`);
   }
+
+  rejectPattern(
+    errors,
+    publishScriptText,
+    /releases\/tags\//,
+    'publish-release.mjs: published-only release-by-tag endpoint cannot discover Draft Releases.',
+  );
 
   if (errors.length > 0) {
     throw new WorkflowPolicyError(errors);

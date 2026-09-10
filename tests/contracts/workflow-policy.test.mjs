@@ -167,4 +167,15 @@ describe('workflow policy (TC-D02 and TC-D05 through TC-D08)', () => {
       }),
     ).toThrow(WorkflowPolicyError);
   });
+
+  it('requires Draft-aware paginated Release discovery', () => {
+    expect(() =>
+      validate({
+        publishScriptText: publishScriptText
+          .replace('releases?per_page=100', 'releases/tags/${tag}')
+          .replace("'--paginate'", "'--no-pagination'")
+          .replace("'--slurp'", "'--raw-pages'"),
+      }),
+    ).toThrow(WorkflowPolicyError);
+  });
 });

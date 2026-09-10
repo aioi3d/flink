@@ -4,7 +4,7 @@ internal enum FlinkNativeBuildInfo {
   static let nativeApiVersion = 1
 
   static var nativeRuntimeVersion: String {
-    stringValue(forInfoKey: "FlinkNativeRuntimeVersion") ?? "1.0.3"
+    stringValue(forInfoKey: "FlinkNativeRuntimeVersion") ?? "1.0.4"
   }
 
   static var nativeRuntimeSignature: String {
