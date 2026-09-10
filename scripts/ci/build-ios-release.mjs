@@ -53,6 +53,22 @@ function run(command, args, options = {}) {
   });
 }
 
+function inspectDeviceMachO(filePath, description) {
+  const architectures = run('/usr/bin/lipo', ['-archs', filePath])
+    .trim()
+    .split(/\s+/);
+  assert(
+    architectures.includes('arm64'),
+    `${description} does not contain arm64.`,
+  );
+  const buildVersion = run('xcrun', ['vtool', '-show-build', filePath]);
+  assert(
+    /platform\s+IOS\b/i.test(buildVersion) && !/SIMULATOR/i.test(buildVersion),
+    `${description} is not built for iOS devices.`,
+  );
+  return architectures;
+}
+
 async function isFile(filePath) {
   try {
     return (await stat(filePath)).isFile();
@@ -428,14 +444,34 @@ try {
   );
   const executablePath = path.join(realAppPath, plist.CFBundleExecutable);
   assert(await isFile(executablePath), 'Built application executable is missing.');
-  const architectures = run('/usr/bin/lipo', ['-archs', executablePath]).trim().split(/\s+/);
-  assert(architectures.includes('arm64'), 'Built application does not contain arm64.');
-  const buildVersion = run('xcrun', ['vtool', '-show-build', executablePath]);
-  assert(/platform\s+IOS\b/i.test(buildVersion), 'Mach-O build version is not for iOS devices.');
-  assert(!/SIMULATOR/i.test(buildVersion), 'Simulator Mach-O must not be packaged.');
-  const linkedLibraries = run('/usr/bin/otool', ['-L', executablePath]);
+  const debugDylibPath = path.join(
+    realAppPath,
+    `${plist.CFBundleExecutable}.debug.dylib`,
+  );
+  const appCodePaths = [executablePath];
+  if (await isFile(debugDylibPath)) {
+    assert(
+      profile === 'development',
+      'Production app unexpectedly contains an Xcode Debug implementation dylib.',
+    );
+    appCodePaths.push(debugDylibPath);
+  }
+  const appCode = appCodePaths.map((filePath) => {
+    const relativePath = path.relative(realAppPath, filePath).split(path.sep).join('/');
+    return {
+      path: relativePath,
+      architectures: inspectDeviceMachO(filePath, `App code ${relativePath}`),
+    };
+  });
+  const appCodeLabels = appCode.map(({ path: relativePath }) => relativePath).join(', ');
+  const linkedLibraries = appCodePaths
+    .map((filePath) => run('/usr/bin/otool', ['-L', filePath]))
+    .join('\n');
   for (const framework of ['ARKit', 'PDFKit', 'SceneKit']) {
-    assert(linkedLibraries.includes(`/${framework}.framework/`), `Built executable is not linked to ${framework}.`);
+    assert(
+      linkedLibraries.includes(`/${framework}.framework/`),
+      `Built app code (${appCodeLabels}) is not linked to ${framework}.`,
+    );
   }
 
   const appFiles = await listFiles(realAppPath);
@@ -460,18 +496,9 @@ try {
     if (!isFrameworkExecutable && !isDynamicLibrary) {
       continue;
     }
-    const embeddedArchitectures = run('/usr/bin/lipo', ['-archs', filePath])
-      .trim()
-      .split(/\s+/);
-    assert(
-      embeddedArchitectures.includes('arm64'),
-      `Embedded code ${components.join('/')} does not contain arm64.`,
-    );
-    const embeddedBuildVersion = run('xcrun', ['vtool', '-show-build', filePath]);
-    assert(
-      /platform\s+IOS\b/i.test(embeddedBuildVersion) &&
-        !/SIMULATOR/i.test(embeddedBuildVersion),
-      `Embedded code ${components.join('/')} is not built for iOS devices.`,
+    const embeddedArchitectures = inspectDeviceMachO(
+      filePath,
+      `Embedded code ${components.join('/')}`,
     );
     embeddedCode.push({
       path: components.join('/'),
@@ -483,10 +510,12 @@ try {
   const podLock = await readFile(podLockPath, 'utf8');
   assert(/(?:^|\n)\s*- FlinkNative\b/m.test(podLock), 'Podfile.lock does not contain the local FlinkNative pod.');
   const providerPath = await findExpoModulesProvider(iosDirectory);
-  const binaryStrings = run('/usr/bin/strings', [executablePath]);
+  const appCodeStrings = appCodePaths
+    .map((filePath) => run('/usr/bin/strings', [filePath]))
+    .join('\n');
   assert(
-    binaryStrings.includes('FlinkNativeModule'),
-    'Built executable contains no FlinkNativeModule registration evidence.',
+    appCodeStrings.includes('FlinkNativeModule'),
+    `Built app code (${appCodeLabels}) contains no FlinkNativeModule registration evidence.`,
   );
   if (profile === 'production') {
     const javascriptBundle = path.join(realAppPath, 'main.jsbundle');
@@ -494,7 +523,7 @@ try {
     assert((await stat(javascriptBundle)).size > 0, 'Production JavaScript bundle is empty.');
   } else {
     const appNames = appFiles.map((filePath) => path.basename(filePath)).join('\n');
-    assert(/devlauncher/i.test(`${appNames}\n${binaryStrings}`), 'Development app contains no Expo Dev Launcher evidence.');
+    assert(/devlauncher/i.test(`${appNames}\n${appCodeStrings}`), 'Development app contains no Expo Dev Launcher evidence.');
   }
 
   const releaseDirectory = path.join(PROJECT_ROOT, 'build', 'release');
@@ -571,6 +600,7 @@ try {
       minimumOSVersion: plist.MinimumOSVersion,
       bundleIdentifier,
       expoModulesProvider: providerPath,
+      appCode,
       embeddedCode,
       codeSigningAllowed: false,
     },

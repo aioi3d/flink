@@ -215,6 +215,8 @@ export function validateWorkflowPolicy({
     [/main\.jsbundle/, 'must verify the production JS bundle'],
     [/Assets\.car/, 'must verify compiled native assets'],
     [/CFBundleSupportedPlatforms/, 'must verify the built device platform'],
+    [/\.debug\.dylib/, 'must inspect the Xcode Debug implementation dylib'],
+    [/appCodePaths/, 'must inspect every app code image'],
     [/devlauncher/i, 'must verify the development launcher'],
     [/Payload[',]/, 'must construct a Payload directory'],
     [/'\/usr\/bin\/ditto'/, 'must package with ditto'],

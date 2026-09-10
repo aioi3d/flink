@@ -1,6 +1,6 @@
 ---
 document_id: FLINK-IMPLEMENTATION-STATUS
-version: 1.0.2-phase2-source
+version: 1.0.3-phase2-source
 updated_at: 2026-09-10
 scope: Phase 1 and Phase 2
 status: phase_2_source_implemented_ci_and_device_unverified
@@ -74,7 +74,7 @@ The machine-specific Xcode application directory is recorded for the future work
 
 ## Phase 2 task ledger
 
-These rows describe source completion only. Swift compilation, framework linking, the unsigned device build, and all runtime behavior remain subject to the first macOS CI run and the two physical-device gates.
+These rows describe source completion only. Final framework inspection, unsigned IPA verification, and all runtime behavior remain subject to a successful macOS CI run and the two physical-device gates.
 
 | Task | Status | Evidence / remaining work |
 |---|---|---|
@@ -88,14 +88,14 @@ These rows describe source completion only. Swift compilation, framework linking
 | P2-08 Face debug | IMPLEMENTED_UNVERIFIED | Release-capable opaque white presentation, dark face mesh with white openings, shared session, no camera-frame export, covered ARSCNView, and rendering-off behavior are implemented. The no-camera-frame guarantee must still be visually inspected on both devices. |
 | P2-09 Context and runtime metadata | IMPLEMENTED_UNVERIFIED | Process-local ContextBroker rejects stale/suspended reader, generation, epoch, and sample-time combinations. API/runtime/profile/signature/source commit are read from embedded metadata. CI must resolve the signature and source commit. |
 | P2-10 Native smoke screen | IMPLEMENTED_UNVERIFIED | Minimal iOS screen exercises init/scan/import/cancel/rename/delete/thumbnail, PDF open/navigation/fit, capabilities/permission/start/stop/reset/drain, numeric coefficients, debug face, and runtime metadata. TypeScript/lint checks pass; native interaction requires the development IPA. |
-| P2-11 CI and first IPA | IMPLEMENTED_UNVERIFIED | Manual/tag validation, Linux preflight, pinned macOS toolchain, CNG/Pods, native signature, unsigned `.app`, IPA packaging/inspection, checksums/build metadata, and GitHub Release publication are implemented with fail-closed policy checks. The second workflow run reached the macOS compile and exposed a now-fixed Swift return error; no successful native build or Release exists yet. |
+| P2-11 CI and first IPA | IMPLEMENTED_UNVERIFIED | Manual/tag validation, Linux preflight, pinned macOS toolchain, CNG/Pods, native signature, unsigned `.app`, IPA packaging/inspection, checksums/build metadata, and GitHub Release publication are implemented with fail-closed policy checks. The third workflow run built the app but exposed a now-fixed Xcode Debug dylib inspection mismatch; no verified IPA or Release exists yet. |
 
 ## Native runtime state
 
 | Field | Value |
 |---|---|
 | Native API | 1 |
-| Native runtime version | 1.0.2 |
+| Native runtime version | 1.0.3 |
 | Algorithm | SHA-256, signature input schema 1 |
 | Recorded installed signature | unresolved (`null`) |
 | CocoaPods lock | unresolved; first Phase 2 macOS build must supply it |
@@ -123,7 +123,9 @@ These rows describe source completion only. Swift compilation, framework linking
 | 2026-09-10 | profile-hermetic regression check | Passed the 13 native-signature contracts with both `FLINK_BUILD_PROFILE=development` and `production` after making the test profiles explicit |
 | 2026-09-10 | second manual `iOS unsigned IPA` run for `dev-runtime-v1.0.1` | Reached the macOS build and failed compiling `FaceSessionCoordinator.drainSamples` because the lock-wrapper result was not returned; Release publication did not start |
 | 2026-09-10 | face drain return regression check | Added a source contract for `return try withStateLock`; the focused 7-test Phase 2 native source suite passed |
-| 2026-09-10 | final Phase 2 `npm run verify:local` | Passed after the profile-test and Swift return repairs: typecheck, lint, 11 files / 136 tests, two-profile config, native check with zero mismatches, and TC-D02 / TC-D05–TC-D08 static CI policy |
+| 2026-09-10 | third manual `iOS unsigned IPA` run for `dev-runtime-v1.0.2` | Xcode build succeeded; post-build verification inspected the Xcode 26 Debug stub instead of `Flink.debug.dylib` and stopped before IPA publication |
+| 2026-09-10 | Xcode Debug dylib inspection regression check | Build verification now checks the app executable and Debug implementation dylib for device architecture, framework links, native module registration, and Dev Launcher evidence; the focused workflow-policy suite passed |
+| 2026-09-10 | final Phase 2 `npm run verify:local` | Passed after the profile-test, Swift return, and Debug dylib verifier repairs: typecheck, lint, 11 files / 137 tests, two-profile config, native check with zero mismatches, and TC-D02 / TC-D05–TC-D08 static CI policy |
 | 2026-09-10 | `expo-modules-autolinking resolve --platform apple --json` | Passed; `flink-native` resolves `FlinkNativeModule` and the `FlinkNative` pod |
 | 2026-09-10 | one-shot `expo export --platform ios` | Passed; the Phase 2 smoke route bundled 1,506 modules without starting a persistent development server |
 | 2026-09-10 | `npm ci` | Passed from `package-lock.json`; 872 packages audited |
@@ -131,7 +133,7 @@ These rows describe source completion only. Swift compilation, framework linking
 | 2026-09-10 | `npx expo-doctor` 1.20.4 | Passed all 21 checks |
 | 2026-09-10 | small fixture generator + `pdfinfo` | Generator refused overwrites as designed; the normal and mixed-size synthetic fixtures each parsed as PDF 1.7 with 3 pages |
 
-The 8-file / 114-test aggregate above is the retained Phase 1 baseline. The 11-file / 136-test aggregate is the final Phase 2 source verification on Windows; it is not a Swift compile or device result.
+The 8-file / 114-test aggregate above is the retained Phase 1 baseline. The 11-file / 137-test aggregate is the final Phase 2 source verification on Windows; it is not a macOS build or device result.
 
 `npm audit --omit=dev` reports 14 moderate advisories in the Expo SDK dependency graph and no high or critical advisories. The offered all-fixes path downgrades core Expo packages across incompatible major versions, so it was not applied. Reassess when an SDK 57-compatible upstream fix is available.
 
@@ -139,7 +141,7 @@ The 8-file / 114-test aggregate above is the retained Phase 1 baseline. The 11-f
 
 | Test | Status | Notes |
 |---|---|---|
-| TC-D02 | CI_PARTIAL | The second run entered the macOS build but stopped on the now-fixed Swift compile error before unsigned `.app` / IPA inspection. |
+| TC-D02 | CI_PARTIAL | The third run completed an unsigned device build and passed the app metadata checks preceding framework inspection. Corrected Debug dylib inspection, final IPA validation, and publication require a new run. |
 | TC-D05 | LOCAL_VERIFIED | Static workflow validator confirms ordinary push/PR runs Linux checks only; `dev-runtime-v*` push is not a native trigger. CI run NOT_STARTED. |
 | TC-D06 | LOCAL_VERIFIED | Static validator rejects artifact upload, EAS commands, signing secrets/files, signing enablement, and provisioning updates. CI run NOT_STARTED. |
 | TC-D07 | CI_PARTIAL | The first preflight verified the existing development tag checkout and source SHA. Invalid-input cases remain contract-tested locally, and release-time remote tag revalidation was not reached. |
@@ -150,7 +152,7 @@ All file, reader, blink-device, UI-device, performance, and security-device test
 
 ## CI workflow boundary
 
-`checks.yml` keeps ordinary push, pull-request, and manual checks on Ubuntu 24.04 with exact Node 24.18.0 / npm 11.16.0. `build-ios-ipa.yml` now implements the Phase 2 path: trusted input validation, exact existing-tag checkout, Linux preflight, an arm64 `macos-26` / Xcode 26.6 job, CNG and locked Pods, resolved native metadata, unsigned device `.app` inspection, IPA packaging, and verified GitHub Release publication. Only the Release job receives `contents: write`; no Apple credential, EAS, or Actions Artifact path exists. The first manual run exposed the now-fixed profile-dependent test in preflight; the second reached Xcode and exposed the now-fixed `drainSamples` return error. Neither run is evidence of a successful native build.
+`checks.yml` keeps ordinary push, pull-request, and manual checks on Ubuntu 24.04 with exact Node 24.18.0 / npm 11.16.0. `build-ios-ipa.yml` now implements the Phase 2 path: trusted input validation, exact existing-tag checkout, Linux preflight, an arm64 `macos-26` / Xcode 26.6 job, CNG and locked Pods, resolved native metadata, unsigned device `.app` inspection, IPA packaging, and verified GitHub Release publication. Only the Release job receives `contents: write`; no Apple credential, EAS, or Actions Artifact path exists. The latest run built `dev-runtime-v1.0.2`, but the verifier treated the Xcode 26 Debug stub as the implementation binary. It now inspects both the stub and `Flink.debug.dylib`; a successful verified package still requires a new run.
 
 ## Fixtures
 
@@ -160,7 +162,7 @@ Small PDF fixtures are reproducible but ignored by version control. FIX-05 throu
 
 1. Keep the confirmed `com.aioi.flink` identifier stable from the first development IPA onward. Changing it later may create a different Documents container.
 2. Review, commit, and push the Phase 2 source using the user's own Git workflow.
-3. Commit and push the Swift compile repair, create `dev-runtime-v1.0.2` at that new commit, push the tag, and manually run **iOS unsigned IPA** with that tag, `profile=development`, and a short Phase 2 smoke-test reason. Do not move or reuse the failed `dev-runtime-v1.0.0` or `dev-runtime-v1.0.1` tags. A development tag push alone intentionally does not start the native job.
+3. Commit and push the Debug dylib verification repair, create `dev-runtime-v1.0.3` at that new commit, push the tag, and manually run **iOS unsigned IPA** with that tag, `profile=development`, and a short Phase 2 smoke-test reason. Do not move or reuse the failed `dev-runtime-v1.0.0`, `dev-runtime-v1.0.1`, or `dev-runtime-v1.0.2` tags. A development tag push alone intentionally does not start the native job.
 4. Do not create a production `v*` tag yet. Reserve it until the development CI and device gate succeeds. Keep Apple certificates, provisioning profiles, account passwords, and App Store Connect keys out of this workflow.
 5. On success, download the IPA, `SHA256SUMS.txt`, `native-build-info.json`, and `Podfile.lock` from the tag's GitHub Release. Preserve the lock as `native-locks/ios/Podfile.lock` and the build metadata as `config/installed-native-build-info.json`; the recorded signatures still need to be updated from verified output before `native:check --require-resolved` can pass.
 6. Re-sign/install the development IPA and execute the Phase 2 smoke gate on both target devices. Provide the workflow log and device observations—or the complete failed-job log—before this ledger is promoted to CI/device verified.

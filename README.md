@@ -31,7 +31,7 @@ macOS build supplies a real `Podfile.lock` and `native-build-info.json`.
 ## First development IPA
 
 1. Commit and push the reviewed Phase 2 source.
-2. Create and push an existing-commit tag such as `dev-runtime-v1.0.2`.
+2. Create and push an existing-commit tag such as `dev-runtime-v1.0.3`.
 3. Manually run the **iOS unsigned IPA** workflow with that tag,
    `profile=development`, and a short reason.
 4. Download the unsigned IPA, `SHA256SUMS.txt`, `native-build-info.json`, and

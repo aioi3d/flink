@@ -109,6 +109,14 @@ describe('workflow policy (TC-D02 and TC-D05 through TC-D08)', () => {
     ).toThrow(WorkflowPolicyError);
   });
 
+  it('requires inspection of the Xcode Debug implementation dylib', () => {
+    expect(() =>
+      validate({
+        buildScriptText: buildScriptText.replace('.debug.dylib', '.ignored.dylib'),
+      }),
+    ).toThrow(WorkflowPolicyError);
+  });
+
   it('requires checkout credentials to be discarded', () => {
     expect(() =>
       validate({
