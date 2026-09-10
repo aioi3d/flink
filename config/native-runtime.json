@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "nativeApiVersion": 1,
-  "nativeRuntimeVersion": "1.0.6",
+  "nativeRuntimeVersion": "1.0.7",
   "signature": {
     "algorithm": "sha256",
     "inputVersion": 1,
@@ -12,7 +12,7 @@
     },
     "resolutionStatus": "unresolved",
     "unresolvedReasons": [
-      "Development runtime 1.0.6 has not been built and recorded."
+      "Development runtime 1.0.7 has not been built and recorded."
     ]
   },
   "nativePackageAllowlist": [

@@ -136,7 +136,7 @@ function assertInfoPlist(config, profile) {
   );
   assert(plist.UIRequiresFullScreen !== true, `${profile}: iPad full-screen must not be forced.`);
   assert(
-    plist.FlinkNativeRuntimeVersion === '1.0.6',
+    plist.FlinkNativeRuntimeVersion === '1.0.7',
     `${profile}: native runtime version metadata is missing.`,
   );
   assert(

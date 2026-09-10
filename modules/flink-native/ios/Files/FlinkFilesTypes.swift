@@ -314,7 +314,8 @@ internal enum FlinkPathSafety {
     // `/var` on Apple platforms) may themselves be symlinks and are outside our trust
     // boundary.
     var current = root.standardizedFileURL
-    if try current.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true {
+    let rootValues = try current.resourceValues(forKeys: [.isSymbolicLinkKey])
+    guard rootValues.isSymbolicLink == false else {
       throw FlinkFilesException(.pathOutsideLibrary, operation: "pathValidation")
     }
 
@@ -323,7 +324,7 @@ internal enum FlinkPathSafety {
       let values = try current.resourceValues(forKeys: [
         .isSymbolicLinkKey,
       ])
-      if values.isSymbolicLink == true {
+      guard values.isSymbolicLink == false else {
         throw FlinkFilesException(.pathOutsideLibrary, operation: "pathValidation")
       }
     }

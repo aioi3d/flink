@@ -25,7 +25,7 @@ npm ci
 npm run verify:local
 ```
 
-The source now targets development runtime `1.0.6`. Its signature and
+The source now targets development runtime `1.0.7`. Its signature and
 installed-build metadata are intentionally unresolved until the replacement
 IPA is built and its Release inputs are recorded. During this transition,
 `npm run native:check -- --profile development` must report `unresolved` with
@@ -33,13 +33,17 @@ no mismatches. The production signature remains intentionally unrecorded.
 
 ## Development IPA status
 
-Runtime `1.0.5` fixed the PDF-view mount race: device testing reached the PDF,
-previous/next navigation, and page-number jumps. Rename still failed because
-the physical-root check archived opaque file identifiers instead of using
-Foundation's equality contract. Runtime `1.0.6` switches that check to
-`isEqual(_:)` while preserving fail-closed containment and symlink checks.
-Build and install `dev-runtime-v1.0.6`, then repeat rename on both iPhone and
-iPad. Keep the earlier Release evidence as historical input.
+Runtime `1.0.6` retained the `isEqual(_:)` identity repair, but device testing
+still rejected rename with `E_PATH_OUTSIDE_LIBRARY`. The remaining coordinator
+path used ordinary resource-value APIs inside a `.forMoving` accessor and
+reconstructed containment from an accessor URL whose spelling is not stable.
+Runtime `1.0.7` uses Foundation's promised-item resource values and coordinated
+source, parent, and library-root intents. It proves containment by rebuilding
+the indexed relative components below the coordinated root, then performs the
+mutation only through the current source/parent intent URLs. It keeps
+fail-closed containment, symlink, identity, and no-replace checks. Build and
+install `dev-runtime-v1.0.7`, then repeat rename on both iPhone and iPad. Keep
+the earlier Release evidence as historical input.
 
 Pushing a `dev-runtime-v*` tag alone does not start a native build. Production
 `v*` tags do trigger the production path, so do not create one until the

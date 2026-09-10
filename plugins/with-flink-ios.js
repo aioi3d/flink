@@ -9,7 +9,7 @@ const {
 const PLUGIN_NAME = 'with-flink-ios';
 const PLUGIN_VERSION = '1.0.0';
 const DEFAULT_BUNDLE_IDENTIFIER = 'com.aioi.flink';
-const DEFAULT_NATIVE_RUNTIME_VERSION = '1.0.6';
+const DEFAULT_NATIVE_RUNTIME_VERSION = '1.0.7';
 const CAMERA_USAGE_DESCRIPTION =
   '両目の瞬きを検出してPDFのページを送るためにカメラを使用します。映像は保存・送信しません。';
 const LOCAL_NETWORK_USAGE_DESCRIPTION =

@@ -117,23 +117,55 @@ describe('Phase 2 native source contract', () => {
     expect(filesSource).not.toContain('PDFDocument(');
   });
 
-  it('accepts coordinator URL aliases only after proving the physical library root', () => {
-    expect(filesSource).toContain('private func coordinatedLibraryRoot(');
-    expect(filesSource).toContain(
-      'isSameFileSystemResource(coordinatedRoot, configuredLibraryRoot)',
-    );
-    expect(filesSource).toContain(
-      'configuredLibraryRoot: paths.library',
-    );
-    expect(filesSource).toContain(
-      'through: coordinatedDestination.deletingLastPathComponent()',
+  it('coordinates mutations from a trusted root and uses promised resource values', () => {
+    expect(filesSource).toContain('NSFileAccessIntent');
+    expect(filesSource).toMatch(
+      /sourceOptions: \.forMoving,[\s\S]*?operation: "renameDocument"/,
     );
     expect(filesSource).toMatch(
-      /\) \{ coordinatedSource, coordinatedDestination in[\s\S]*?revalidateResolvedDocument\([\s\S]*?coordinatedSource[\s\S]*?coordinatedLibraryRoot\([\s\S]*?coordinatedDestination[\s\S]*?assertNoSymbolicLink[\s\S]*?atomicRenameNoReplace\(/,
+      /sourceOptions: \.forDeleting,[\s\S]*?operation: "deleteDocument"/,
+    );
+
+    const mutationCoordinator = filesSource.slice(
+      filesSource.indexOf('private func coordinateMutation('),
+      filesSource.indexOf('private func revalidateResolvedDocument('),
+    );
+    expect(mutationCoordinator).toContain('sourceIntent');
+    expect(mutationCoordinator).toContain('parentIntent');
+    expect(mutationCoordinator).toContain('rootIntent');
+    expect(mutationCoordinator).toContain('coordinator.coordinate(with: intents, queue: accessQueue)');
+    expect(mutationCoordinator).toContain('sourceIntent.url');
+    expect(mutationCoordinator).toContain('parentIntent?.url ?? rootIntent.url');
+    expect(mutationCoordinator).toContain('rootIntent.url');
+    expect(mutationCoordinator).toContain('CoordinationOutcome');
+    expect(mutationCoordinator).toContain('@escaping @Sendable');
+    expect(mutationCoordinator).toContain('expectedLibraryRootIdentity');
+    expect(mutationCoordinator).toContain('withExtendedLifetime((coordinator, accessQueue))');
+    expect(mutationCoordinator).not.toContain('writingItemAt: destination');
+
+    expect(filesSource).not.toContain('private func coordinatedLibraryRoot(');
+    expect(filesSource).toContain('promisedItemResourceValues(forKeys: keys)');
+    expect(filesSource).toContain('private func assertNoCoordinatedSymbolicLink(');
+    expect(filesSource).toContain('private func validatedRelativePathComponents(');
+    expect(filesSource).toMatch(
+      /coordinatedLibraryRoot: URL,[\s\S]*?validatedRelativePathComponents\([\s\S]*?coordinatedURL\([\s\S]*?assertNoCoordinatedSymbolicLink\(/,
     );
     expect(filesSource).toMatch(
-      /willMoveTo: coordinatedDestination[\s\S]*?atomicRenameNoReplace\([\s\S]*?didMoveTo: coordinatedDestination/,
+      /coordinatedParent,[\s\S]*?rootedParent,[\s\S]*?coordinated-parent-identity/,
     );
+    expect(filesSource).toMatch(
+      /coordinatedSource,[\s\S]*?rootedSource,[\s\S]*?fileChanged/,
+    );
+    expect(filesSource).toMatch(
+      /coordinated-library-kind[\s\S]*?coordinated-library-identity/,
+    );
+    expect(filesSource).toMatch(
+      /let coordinatedDestination = mutationURLs\.sourceParent[\s\S]*?appendingPathComponent\(newName, isDirectory: false\)/,
+    );
+    expect(filesSource).toMatch(
+      /atomicRenameNoReplace\([\s\S]*?usesPromisedItemResourceValues: true/,
+    );
+    expect(filesSource).not.toContain('coordinator.item(');
     expect(filesSource).toMatch(
       /canonicalRelativePath\(\$0\.relativePath\)\s*== canonicalRelativePath\(expectedRelativePath\)/,
     );
@@ -141,13 +173,38 @@ describe('Phase 2 native source contract', () => {
       'candidate.resolvingSymlinksInPath()',
     );
 
+    const coordinatorRevalidation = filesSource.slice(
+      filesSource.indexOf('private func revalidateResolvedDocument('),
+      filesSource.indexOf('private func rejectRenameConflict('),
+    );
+    expect(coordinatorRevalidation).not.toContain('FlinkResourceIdentity.hashed');
+    expect(coordinatorRevalidation).not.toContain('coordinatedSource.lastPathComponent');
+    expect(coordinatorRevalidation).not.toContain('coordinatedSource.deletingLastPathComponent');
+    expect(coordinatorRevalidation).toContain('resourceIdentity: resolved.resourceIdentity');
+    expect(coordinatorRevalidation).toContain('usesPromisedItemResourceValues: true');
+    expect(coordinatorRevalidation).toContain('source: coordinatedSource');
+    expect(coordinatorRevalidation).toContain('sourceParent: coordinatedParent');
+    expect(coordinatorRevalidation).toContain('coordinated-parent-kind');
+    expect(coordinatorRevalidation).toContain('values.isSymbolicLink == false');
+    expect(filesSource).toContain('includingPropertiesForKeys: nil');
+    expect(filesTypesSource).toContain('guard values.isSymbolicLink == false');
+
     const identityHelper = filesSource.slice(
       filesSource.indexOf('private func isSameFileSystemResource('),
       filesSource.indexOf('private func posixMutationError('),
     );
+    expect(identityHelper).toContain(') throws -> Bool');
+    expect(identityHelper).toContain('let left = try resourceValues(');
+    expect(identityHelper).toContain('let right = try resourceValues(');
+    expect(identityHelper).not.toContain('try? resourceValues(');
     expect(identityHelper).toContain(
       'return leftIdentifier.isEqual(rightIdentifier)',
     );
+    expect(identityHelper).toContain('return try hasSamePOSIXIdentity(lhs, rhs, operation: operation)');
+    expect(identityHelper).toContain('private func posixIdentity(');
+    expect(identityHelper).toContain('POSIXFileSystemIdentity(');
+    expect(identityHelper).toContain('device: UInt64(status.st_dev)');
+    expect(identityHelper).toContain('inode: UInt64(status.st_ino)');
     expect(identityHelper).not.toContain('FlinkResourceIdentity.hashed');
   });
 
