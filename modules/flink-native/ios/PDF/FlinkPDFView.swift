@@ -2,7 +2,7 @@ import ExpoModulesCore
 import PDFKit
 import UIKit
 
-/// PDFKit-backed, vertically continuous reader. File URLs are never accepted
+/// PDFKit-backed, horizontally paged reader. File URLs are never accepted
 /// from JS: every open resolves a current DocumentRef through
 /// FlinkFilesRuntime first.
 @MainActor
@@ -353,11 +353,11 @@ internal final class FlinkPDFView: ExpoView {
   private func configurePDFView() {
     pdfView.translatesAutoresizingMaskIntoConstraints = true
     pdfView.backgroundColor = .clear
-    pdfView.displayMode = .singlePageContinuous
-    pdfView.displayDirection = .vertical
+    pdfView.displayMode = .singlePage
+    pdfView.displayDirection = .horizontal
     pdfView.displaysAsBook = false
     pdfView.displaysRTL = false
-    pdfView.usePageViewController(false, withViewOptions: nil)
+    pdfView.usePageViewController(true, withViewOptions: nil)
     pdfView.autoScales = true
     pdfView.isUserInteractionEnabled = true
     pdfView.accessibilityLabel = "PDFビューア"
@@ -600,8 +600,9 @@ internal final class FlinkPDFView: ExpoView {
   /// Only same-document go-to actions are meaningful in this read-only view.
   /// Removing every other annotation action blocks URL/remote-document launch,
   /// named actions such as print, and form reset without touching the file.
-  /// Continuous reading scans only pages that PDFKit is presenting, keeping the
-  /// work bounded even for very large documents.
+  /// The scan stays limited to pages PDFKit is presenting, including an
+  /// adjacent page during a page-controller transition, keeping the work
+  /// bounded even for very large documents.
   private func disableExternalActions(on page: PDFPage) {
     for annotation in page.annotations {
       if let action = annotation.action,
@@ -689,7 +690,10 @@ internal final class FlinkPDFView: ExpoView {
   @objc private func pdfPageChanged(_ notification: Notification) {
     guard !ignorePageChangeNotification,
           !navigationInProgress,
+          documentIsValid,
+          !lifecycleIsSuspended,
           let snapshot = activeSnapshot,
+          snapshot.state == .ready,
           let document = pdfView.document,
           let currentPage = pdfView.currentPage else {
       return
@@ -708,9 +712,10 @@ internal final class FlinkPDFView: ExpoView {
       document: snapshot.document,
       pageIndex: pageIndex,
       pageCount: snapshot.pageCount,
-      state: lifecycleIsSuspended ? .suspended : .ready
+      state: .ready
     )
     activeSnapshot = updated
+    fitDisplayedPage()
     emitPageChanged(updated)
     emitStateChanged(updated)
   }

@@ -277,12 +277,17 @@ describe('Phase 2 native source contract', () => {
     expect(thumbnailSource).toContain('pdf.page(at: 0)');
   });
 
-  it('loads PDFKit documents by URL and supports safe vertical continuous reading', () => {
+  it('loads PDFKit documents by URL and supports safe horizontal page swiping', () => {
     expect(pdfLoaderSource).toContain('PDFDocument(url:');
     expect(pdfLoaderSource).not.toContain('PDFDocument(data:');
-    expect(pdfViewSource).toContain('displayMode = .singlePageContinuous');
-    expect(pdfViewSource).toContain('displayDirection = .vertical');
-    expect(pdfViewSource).not.toContain('displayDirection = .horizontal');
+    expect(pdfViewSource).toMatch(/displayMode = \.singlePage\s*$/m);
+    expect(pdfViewSource).toContain('displayDirection = .horizontal');
+    expect(pdfViewSource).not.toContain('displayMode = .singlePageContinuous');
+    expect(pdfViewSource).not.toContain('displayDirection = .vertical');
+    expect(pdfViewSource).toContain(
+      'usePageViewController(true, withViewOptions: nil)',
+    );
+    expect(pdfViewSource).not.toContain('UISwipeGestureRecognizer');
     expect(pdfViewSource).toContain('scaleFactorForSizeToFit');
     expect(pdfViewSource).toContain('recentCommandIds');
     expect(pdfViewSource).toContain('FlinkReaderContextBroker.shared');
@@ -296,7 +301,9 @@ describe('Phase 2 native source contract', () => {
       pdfViewSource.indexOf('@objc private func pdfPageChanged'),
       pdfViewSource.indexOf('@objc private func applicationWillResignActive'),
     );
-    expect(passivePageChange).not.toContain('fitDisplayedPage()');
+    expect(passivePageChange).toContain('fitDisplayedPage()');
+    expect(passivePageChange).toContain('documentIsValid');
+    expect(passivePageChange).toContain('snapshot.state == .ready');
     expect(moduleSource).not.toContain('AsyncFunction("fitCurrentPage")');
     expect(pdfViewSource).not.toContain('func fitCurrentPage(');
     expect(smokeScreenSource).not.toContain('fitCurrentPage');

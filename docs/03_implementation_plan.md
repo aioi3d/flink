@@ -138,7 +138,7 @@ Phase 1の契約とローカル検証が完了していること。ユーザー�
 
 **P2-04：削除・rename・presenter。** coordinated write、revision検証、名前検証、キャッシュ無効化、読書中ファイルのrelinquish、外部削除／移動を実装する。provider callbackとmain間のデッドロックをレビューする。
 
-**P2-05：PDFView。** URLベース読込、縦方向の連続表示、前／次、ページ数表示タップからの番号ダイアログ移動、自動fit、mixed page size、回転、ロック・破損判定、readerSessionId、open requestキャンセル、command dedupeを実装する。明示的な移動・open・layoutではfitするが、受動的なスクロールでのページ変更では倍率や位置をリセットしない。可視ページすべてで外部PDFアクションを無効化する。手動のページ全体リセットは提供しない。非同期メソッドを単にmain上で巨大処理を行うラッパーにしない。
+**P2-05：PDFView。** URLベース読込、LTRの横向き1ページPageViewControllerページング、右→左スワイプの次ページ／左→右スワイプの前ページ、前／次、ページ数表示タップからの番号ダイアログ移動、自動fit、mixed page size、回転、ロック・破損判定、readerSessionId、open requestキャンセル、command dedupeを実装する。open・明示的な移動・スワイプ完了・layoutではfitするが、対話的なページング遷移中には強制しない。PageViewController遷移中の可視隣接ページを含む全可視ページで外部PDFアクションを無効化する。手動のページ全体リセットは提供しない。非同期メソッドを単にmain上で巨大処理を行うラッパーにしない。
 
 **P2-06：サムネイル。** page 0、ライブラリ表示時の自動直列要求、生成1件、キャッシュ、キャンセル、reader優先・メモリ警告対応を実装する。
 
@@ -156,7 +156,7 @@ Phase 1の契約とローカル検証が完了していること。ユーザー�
 
 ```text
 [ ] Files: init / scan / picker / cancel / rename / delete / thumbnail が実装済み
-[ ] PDF: open / close / vertical continuous scroll / prev / next / dialog jump / fit / visible-page action suppression / notifications が実装済み
+[ ] PDF: open / close / LTR horizontal single-page paging / swipe prev-next / prev / next / dialog jump / fit / visible-page action suppression / notifications が実装済み
 [ ] Face: permission / capability / start / stop / reset / drain が実装済み
 [ ] Face debug: 白背景・顔・目・口・表示OFF時の停止が実装済み
 [ ] lifecycle: inactive / background / JS reload / stale commands が扱われる
@@ -265,7 +265,7 @@ FR-001〜FR-007が実装され、両実機でファイル経路、非PDF除外�
 
 **P4-04：Lifecycle。** PDF openで自動開始、権限拒否時の手動閲覧、background停止、モーダル停止、顔ロスト後の再アーム、JS reload、PDF切替時の破棄を実装する。通常の開始ボタンを追加しない。
 
-**P4-05：Reader UI。** 縦スクロール、ピンチ、前／次、ページ数表示タップで開くページ番号ダイアログ、境界状態、ロード・エラー、追跡状態を仕上げる。手動のページ全体リセットは追加しない。ズーム中の瞬きや明示的な移動は移動先で自動fitする一方、受動的なスクロールでは倍率を維持する。PDF本文検索や見開きを追加しない。
+**P4-05：Reader UI。** LTRの横向き1ページスワイプ（右→左で次、左→右で前）、ピンチ、前／次、ページ数表示タップで開くページ番号ダイアログ、境界状態、ロード・エラー、追跡状態を仕上げる。手動のページ全体リセットは追加しない。ズーム中の瞬き、明示的な移動、確定したスワイプは移動先で自動fitする。PDF本文検索、縦連続スクロール、見開きを追加しない。
 
 **P4-06：Settings。** モード切替、デバッグON/OFF、説明、runtime診断を作る。設定はプロセス内だけとし、切替時に判定途中の候補を破棄する。
 
@@ -367,8 +367,8 @@ FIX-07 / FIX-08 / FIX-09は端末空き容量に合わせて個別に試す。10
 | ID | 環境 | 操作と期待結果 |
 |---|---|---|
 | TC-R01 | Device | 正常PDFを開く→PDFKitでpage0を表示。読込中に別PDFへ切替→古いopen完了で上書きしない。 |
-| TC-R02 | Local + Device | 前／次／ページ数表示をタップして開く番号ダイアログ、先頭、最後、1ページPDF→境界を超えず番号変換が正しい。同一command再送は1回だけ。 |
-| TC-R03 | Device | 縦方向にスクロールして複数ページを通過→現在ページ番号が追随し、倍率・位置がfitでリセットされない。ピンチ拡大中に瞬き／前次／番号ダイアログで明示移動→対象ページへ進みfit。混在サイズ、90度回転メタデータでも切れない。可視の隣接ページを含め外部PDFリンクが起動しない。 |
+| TC-R02 | Local + Device | 前／次／ページ数表示をタップして開く番号ダイアログ、LTRスワイプ（右→左で次、左→右で前）、先頭、最後、1ページPDF→境界を超えず番号変換が正しい。同一command再送は1回だけ。 |
+| TC-R03 | Device | LTRの横向き1ページページングで、右→左スワイプ完了は次、左→右スワイプ完了は前へ移動し、確定後にfitする。ピンチ拡大中に瞬き／前次／番号ダイアログで明示移動→対象ページへ進みfit。混在サイズ、90度回転メタデータでも切れない。PageViewController遷移中の可視隣接ページを含め外部PDFリンクが起動しない。 |
 | TC-R04 | Device | portrait / landscape、iPad sidebar開閉／幅変更→現在ページを維持してfit。文書の再読込・先頭戻りなし。 |
 | TC-R05 | Device | パスワード必須、空パスワード暗号化、破損、0ページ、消失→各仕様の表示。ロックは固定文言、パスワード入力なし、カメラ停止。 |
 | TC-R06 | Device | 数ページ読みmode変更→readerを閉じて再openするとpage0。プロセス再起動で設定初期化、PDF自体は残る。background往復だけなら現在ページ維持。 |
