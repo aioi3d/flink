@@ -327,3 +327,8 @@ export interface FlinkPDFViewEventProps {
   onPageChanged?: (event: NativeViewEvent<PageChangedEvent>) => void;
   onReaderError?: (event: NativeViewEvent<ReaderErrorEvent>) => void;
 }
+
+export interface FlinkFaceDebugViewProps {
+  /** Stops SceneKit rendering while false; it does not own or restart ARSession. */
+  visible: boolean;
+}

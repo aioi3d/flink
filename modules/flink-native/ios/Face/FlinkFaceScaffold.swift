@@ -1,5 +1,9 @@
 import Foundation
 
-/// Namespace reserved for the Phase 2 FaceSessionCoordinator and context broker.
-/// The Phase 1 scaffold never starts a camera or returns fabricated samples.
-internal enum FlinkFaceScaffold {}
+/// Limits shared by the face capture path and its static/native tests.
+internal enum FlinkFaceLimits {
+  static let sampleCapacity = 128
+  static let heartbeatTimeoutMs = 2_000.0
+  static let watchdogIntervalMs = 250.0
+  static let debugFrameIntervalMs = 1_000.0 / 30.0
+}

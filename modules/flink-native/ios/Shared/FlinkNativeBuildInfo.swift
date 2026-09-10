@@ -16,6 +16,10 @@ internal enum FlinkNativeBuildInfo {
   }
 
   static var buildProfile: String {
+    if let embedded = stringValue(forInfoKey: "FlinkNativeBuildProfile"),
+       embedded == "development" || embedded == "production" {
+      return embedded
+    }
     #if DEBUG
     return "development"
     #else

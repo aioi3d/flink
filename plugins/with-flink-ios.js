@@ -8,6 +8,8 @@ const {
 
 const PLUGIN_NAME = 'with-flink-ios';
 const PLUGIN_VERSION = '1.0.0';
+const DEFAULT_BUNDLE_IDENTIFIER = 'com.aioi.flink';
+const DEFAULT_NATIVE_RUNTIME_VERSION = '1.0.0';
 const CAMERA_USAGE_DESCRIPTION =
   '両目の瞬きを検出してPDFのページを送るためにカメラを使用します。映像は保存・送信しません。';
 const LOCAL_NETWORK_USAGE_DESCRIPTION =
@@ -38,6 +40,46 @@ function resolveBuildProfile(environment = process.env) {
     );
   }
   return value;
+}
+
+function resolveBuildMetadata(environment = process.env) {
+  const nativeRuntimeVersion =
+    environment.FLINK_NATIVE_RUNTIME_VERSION || DEFAULT_NATIVE_RUNTIME_VERSION;
+  const nativeRuntimeSignature =
+    environment.FLINK_NATIVE_RUNTIME_SIGNATURE || 'unresolved';
+  const sourceCommit = environment.FLINK_SOURCE_COMMIT || undefined;
+  const buildNumber = environment.FLINK_BUILD_NUMBER || undefined;
+
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(nativeRuntimeVersion)) {
+    throw new Error(
+      `[${PLUGIN_NAME}] FLINK_NATIVE_RUNTIME_VERSION must be a semantic version.`,
+    );
+  }
+  if (
+    nativeRuntimeSignature !== 'unresolved' &&
+    !/^[a-f0-9]{64}$/.test(nativeRuntimeSignature)
+  ) {
+    throw new Error(
+      `[${PLUGIN_NAME}] FLINK_NATIVE_RUNTIME_SIGNATURE must be "unresolved" or a lowercase SHA-256 digest.`,
+    );
+  }
+  if (sourceCommit !== undefined && !/^[a-f0-9]{40}$/.test(sourceCommit)) {
+    throw new Error(
+      `[${PLUGIN_NAME}] FLINK_SOURCE_COMMIT must be a full lowercase Git commit id.`,
+    );
+  }
+  if (buildNumber !== undefined && !/^\d+(?:\.\d+){0,2}$/.test(buildNumber)) {
+    throw new Error(
+      `[${PLUGIN_NAME}] FLINK_BUILD_NUMBER must contain one to three numeric components.`,
+    );
+  }
+
+  return {
+    nativeRuntimeVersion,
+    nativeRuntimeSignature,
+    sourceCommit,
+    buildNumber,
+  };
 }
 
 function withoutExpoBonjourService(value) {
@@ -100,7 +142,7 @@ function configureTransportSecurity(infoPlist, profile) {
   }
 }
 
-function applyFlinkInfoPlist(infoPlist, profile) {
+function applyFlinkInfoPlist(infoPlist, profile, metadata = resolveBuildMetadata()) {
   const result = { ...infoPlist };
   result.UIFileSharingEnabled = true;
   result.LSSupportsOpeningDocumentsInPlace = true;
@@ -108,6 +150,14 @@ function applyFlinkInfoPlist(infoPlist, profile) {
   result.UISupportedInterfaceOrientations = [...IPHONE_ORIENTATIONS];
   result['UISupportedInterfaceOrientations~ipad'] = [...IPAD_ORIENTATIONS];
   result.UIRequiresFullScreen = false;
+  result.FlinkNativeRuntimeVersion = metadata.nativeRuntimeVersion;
+  result.FlinkNativeRuntimeSignature = metadata.nativeRuntimeSignature;
+  result.FlinkNativeBuildProfile = profile;
+  if (metadata.sourceCommit) {
+    result.FlinkNativeSourceCommit = metadata.sourceCommit;
+  } else {
+    delete result.FlinkNativeSourceCommit;
+  }
 
   if (profile === 'development') {
     const services = Array.isArray(result.NSBonjourServices)
@@ -147,7 +197,7 @@ function applyFlinkBaseConfig(config) {
     userInterfaceStyle: 'automatic',
     ios: {
       ...(config.ios ?? {}),
-      bundleIdentifier: config.ios?.bundleIdentifier ?? 'com.local.flink',
+      bundleIdentifier: config.ios?.bundleIdentifier ?? DEFAULT_BUNDLE_IDENTIFIER,
       deploymentTarget: '18.0',
       supportsTablet: true,
     },
@@ -156,14 +206,22 @@ function applyFlinkBaseConfig(config) {
 
 function withFlinkIos(config) {
   const profile = resolveBuildProfile();
+  const metadata = resolveBuildMetadata();
   let nextConfig = applyFlinkBaseConfig(config);
+  if (metadata.buildNumber) {
+    nextConfig.ios.buildNumber = metadata.buildNumber;
+  }
 
   // SDK 57 has a built-in ios.deploymentTarget property. Explicitly install the
   // matching mods so this plugin remains independently reproducible.
   nextConfig = IOSConfig.DeploymentTarget.withDeploymentTarget(nextConfig);
   nextConfig = IOSConfig.DeploymentTarget.withDeploymentTargetPodfileProps(nextConfig);
   nextConfig = withInfoPlist(nextConfig, (modConfig) => {
-    modConfig.modResults = applyFlinkInfoPlist(modConfig.modResults, profile);
+    modConfig.modResults = applyFlinkInfoPlist(
+      modConfig.modResults,
+      profile,
+      metadata,
+    );
     return modConfig;
   });
 
@@ -174,10 +232,13 @@ module.exports = createRunOncePlugin(withFlinkIos, PLUGIN_NAME, PLUGIN_VERSION);
 module.exports.applyFlinkBaseConfig = applyFlinkBaseConfig;
 module.exports.applyFlinkInfoPlist = applyFlinkInfoPlist;
 module.exports.resolveBuildProfile = resolveBuildProfile;
+module.exports.resolveBuildMetadata = resolveBuildMetadata;
 module.exports.constants = {
   CAMERA_USAGE_DESCRIPTION,
   EXPO_BONJOUR_SERVICE,
   IPAD_ORIENTATIONS,
   IPHONE_ORIENTATIONS,
   LOCAL_NETWORK_USAGE_DESCRIPTION,
+  DEFAULT_BUNDLE_IDENTIFIER,
+  DEFAULT_NATIVE_RUNTIME_VERSION,
 };

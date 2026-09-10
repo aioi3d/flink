@@ -1,56 +1,52 @@
-# Welcome to your Expo app 👋
+# Flink
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Flink is an Expo SDK 57 iOS/iPadOS PDF reader. Phase 2 provides the native
+foundation for Files integration, PDFKit, ARKit face coefficients, the neutral
+face debug view, runtime compatibility metadata, and unsigned IPA packaging.
 
-## Get started
+The current route is a **Phase 2 native smoke screen**, not the finished
+library/reader UI. The reference UI is implemented in later phases.
 
-1. Install dependencies
+## Requirements
 
-   ```bash
-   npm install
-   ```
+- Node.js 24.18.0
+- npm 11.16.0
+- An iOS development build containing the local `FlinkNative` Expo Module
+- iOS/iPadOS 18.0 or newer
 
-2. Start the app
+Expo Go cannot run the Phase 2 native APIs. Native compilation is performed by
+the pinned GitHub Actions macOS job; the Windows checkout does not require
+Xcode.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Local verification
 
 ```bash
-npm run reset-project
+npm ci
+npm run verify:local
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`native:check` intentionally reports `unresolved` until the first successful
+macOS build supplies a real `Podfile.lock` and `native-build-info.json`.
 
-### Other setup steps
+## First development IPA
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+1. Commit and push the reviewed Phase 2 source.
+2. Create and push an existing-commit tag such as `dev-runtime-v1.0.0`.
+3. Manually run the **iOS unsigned IPA** workflow with that tag,
+   `profile=development`, and a short reason.
+4. Download the unsigned IPA, `SHA256SUMS.txt`, `native-build-info.json`, and
+   `Podfile.lock` from the tag's GitHub Release. Preserve the latter two as
+   `config/installed-native-build-info.json` and
+   `native-locks/ios/Podfile.lock` for the follow-up signature update.
+5. Re-sign/install the IPA with SideStore or an equivalent tool, then run the
+   smoke checklist on both iPhone and iPad and retain the workflow/device log.
 
-## Learn more
+Pushing a `dev-runtime-v*` tag alone does not start a native build. Production
+`v*` tags do trigger the production path, so do not create one until the
+development gate passes. The workflow never requests Apple
+certificates, provisioning profiles, or App Store Connect credentials, and it
+does not use GitHub Actions artifacts.
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+See [implementation status](docs/implementation-status.md) and the
+[implementation plan](docs/03_implementation_plan.md) for the verification
+boundary and device checklist.

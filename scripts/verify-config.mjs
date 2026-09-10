@@ -135,6 +135,18 @@ function assertInfoPlist(config, profile) {
     `${profile}: iPad orientations do not match the contract.`,
   );
   assert(plist.UIRequiresFullScreen !== true, `${profile}: iPad full-screen must not be forced.`);
+  assert(
+    plist.FlinkNativeRuntimeVersion === '1.0.0',
+    `${profile}: native runtime version metadata is missing.`,
+  );
+  assert(
+    plist.FlinkNativeRuntimeSignature === 'unresolved',
+    `${profile}: unresolved local native signature metadata is missing.`,
+  );
+  assert(
+    plist.FlinkNativeBuildProfile === profile,
+    `${profile}: native build profile metadata does not match.`,
+  );
 
   const transport = plist.NSAppTransportSecurity ?? {};
   for (const key of [

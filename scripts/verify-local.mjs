@@ -43,5 +43,5 @@ for (const script of scripts) {
 }
 
 if (!process.exitCode) {
-  console.log('\nLocal Phase 1 verification completed successfully.');
+  console.log('\nLocal Phase 2 source verification completed successfully.');
 }

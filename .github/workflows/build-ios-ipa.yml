@@ -1,4 +1,4 @@
-name: iOS IPA - Phase 1 preflight only
+name: iOS unsigned IPA
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to validate and eventually build
+        description: Existing tag to build
         type: string
         required: true
       profile:
@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ios-preflight-${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  group: ios-native-${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -34,6 +34,12 @@ jobs:
     name: Validate requested existing tag
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.inputs.outputs.tag }}
+      profile: ${{ steps.inputs.outputs.profile }}
+      version: ${{ steps.inputs.outputs.version }}
+      native_runtime_version: ${{ steps.inputs.outputs.native_runtime_version }}
+      source_sha: ${{ steps.source.outputs.source_sha }}
     env:
       FLINK_EVENT_NAME: ${{ github.event_name }}
       FLINK_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
@@ -44,6 +50,8 @@ jobs:
     steps:
       - name: Check out workflow source for trusted validation
         uses: actions/checkout@v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Use pinned Node.js
         uses: actions/setup-node@v7.0.0
@@ -60,15 +68,18 @@ jobs:
         with:
           ref: refs/tags/${{ env.FLINK_TAG }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Use pinned npm
         shell: bash
         run: |
+          set -euo pipefail
           npm install --global npm@11.16.0
           test "$(npm --version)" = "11.16.0"
 
       - name: Validate tagged event, tag, profile, reason, and app version
-        run: node scripts/ci/validate-build-inputs.mjs
+        id: inputs
+        run: node scripts/ci/validate-build-inputs.mjs --github-output
 
       - name: Verify tag checkout and record source SHA
         id: source
@@ -88,17 +99,120 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run local preflight checks
+      - name: Run Linux preflight checks
         run: |
           npm run typecheck
+          npm run lint
           npm run test:unit
           npm run verify:config
           npm run native:check
           npm run verify:ci
 
-      - name: Stop before unavailable native build
+  build-and-release:
+    name: Build unsigned device IPA and publish Release assets
+    needs: preflight
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      FLINK_TAG: ${{ needs.preflight.outputs.tag }}
+      FLINK_VERSION: ${{ needs.preflight.outputs.version }}
+      FLINK_BUILD_PROFILE: ${{ needs.preflight.outputs.profile }}
+      FLINK_NATIVE_RUNTIME_VERSION: ${{ needs.preflight.outputs.native_runtime_version }}
+      FLINK_SOURCE_COMMIT: ${{ needs.preflight.outputs.source_sha }}
+      FLINK_BUILD_NUMBER: ${{ github.run_number }}
+      FLINK_RUN_NUMBER: ${{ github.run_number }}
+      FLINK_RUN_ATTEMPT: ${{ github.run_attempt }}
+    steps:
+      - name: Check out the validated existing tag
+        uses: actions/checkout@v6.0.3
+        with:
+          ref: refs/tags/${{ needs.preflight.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify source transfer from preflight
         shell: bash
         run: |
-          echo "FLINK_PHASE_1_NATIVE_BUILD_UNAVAILABLE"
-          echo "Phase 1 validates inputs only. Phase 2 must implement and verify the unsigned device build and Release publication path." >&2
-          exit 1
+          set -euo pipefail
+          tag_ref="refs/tags/${FLINK_TAG}"
+          git show-ref --verify "$tag_ref"
+          test "$(git rev-list -n 1 "$tag_ref")" = "$FLINK_SOURCE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$FLINK_SOURCE_COMMIT"
+
+      - name: Use pinned Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Verify pinned Xcode and Ruby
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "arm64"
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version | grep -Fx 'Xcode 26.6'
+          ruby --version | grep -E '^ruby 3\.4\.10([[:space:]]|p)'
+
+      - name: Install exact npm and CocoaPods
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global npm@11.16.0
+          test "$(npm --version)" = "11.16.0"
+          gem install cocoapods --version 1.17.0 --no-document
+          test "$(pod _1.17.0_ --version)" = "1.17.0"
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Generate the profile-specific iOS project
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e ios
+          ./node_modules/.bin/expo prebuild --platform ios --no-install
+
+      - name: Resolve or enforce the CocoaPods lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f native-locks/ios/Podfile.lock ]; then
+            cp native-locks/ios/Podfile.lock ios/Podfile.lock
+            (cd ios && pod _1.17.0_ install --deployment)
+          else
+            (cd ios && pod _1.17.0_ install)
+            mkdir -p native-locks/ios
+            cp ios/Podfile.lock native-locks/ios/Podfile.lock
+          fi
+
+      - name: Resolve the native runtime signature
+        id: signature
+        run: node scripts/ci/resolve-native-signature.mjs
+
+      - name: Embed resolved metadata and reconfirm Pods
+        env:
+          FLINK_NATIVE_RUNTIME_SIGNATURE: ${{ steps.signature.outputs.signature }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/expo prebuild --platform ios --no-install
+          cp native-locks/ios/Podfile.lock ios/Podfile.lock
+          (cd ios && pod _1.17.0_ install --deployment)
+          cmp ios/Podfile.lock native-locks/ios/Podfile.lock
+
+      - name: Build, inspect, and package the unsigned device app
+        id: package
+        env:
+          FLINK_NATIVE_RUNTIME_SIGNATURE: ${{ steps.signature.outputs.signature }}
+        run: node scripts/ci/build-ios-release.mjs
+
+      - name: Publish verified GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FLINK_NATIVE_RUNTIME_SIGNATURE: ${{ steps.signature.outputs.signature }}
+        run: node scripts/ci/publish-release.mjs

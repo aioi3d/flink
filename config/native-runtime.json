@@ -12,7 +12,7 @@
     },
     "resolutionStatus": "unresolved",
     "unresolvedReasons": [
-      "Phase 2 native implementation has not been compiled."
+      "Phase 2 source is implemented, but the macOS native build and resolved Pod lock have not run yet."
     ]
   },
   "nativePackageAllowlist": [

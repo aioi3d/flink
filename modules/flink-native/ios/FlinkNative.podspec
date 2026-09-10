@@ -15,7 +15,7 @@ Pod::Spec.new do |s|
   s.dependency 'ExpoModulesCore'
 
   # Declare all Phase 2 system frameworks before the first development runtime.
-  s.frameworks = 'ARKit', 'PDFKit', 'SceneKit', 'UIKit', 'UniformTypeIdentifiers'
+  s.frameworks = 'ARKit', 'AVFoundation', 'CryptoKit', 'Metal', 'PDFKit', 'SceneKit', 'UIKit', 'UniformTypeIdentifiers'
   s.source_files = '**/*.{h,m,mm,swift}'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',

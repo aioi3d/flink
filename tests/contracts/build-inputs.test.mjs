@@ -12,6 +12,7 @@ const production = {
   reason: 'production tag push',
   githubRef: 'refs/tags/v1.0.0',
   appVersion: '1.0.0',
+  nativeRuntimeVersion: '1.0.0',
 };
 
 describe('build input contract (TC-D07)', () => {
@@ -35,6 +36,7 @@ describe('build input contract (TC-D07)', () => {
         reason: 'first native runtime check',
         githubRef: 'refs/heads/main',
         appVersion: '1.0.0',
+        nativeRuntimeVersion: '1.2.3',
       }),
     ).toMatchObject({
       tagRef: 'refs/tags/dev-runtime-v1.2.3',
@@ -73,6 +75,27 @@ describe('build input contract (TC-D07)', () => {
     ).toThrow(/does not match Expo app version/);
   });
 
+  it('rejects development tag and native runtime version drift', () => {
+    expect(() =>
+      validateBuildInputs({
+        ...production,
+        eventName: 'workflow_dispatch',
+        githubRef: 'refs/heads/main',
+        tag: 'dev-runtime-v1.0.1',
+        profile: 'development',
+      }),
+    ).toThrow(/does not match native runtime version/);
+  });
+
+  it('rejects an invalid native runtime version before emitting it', () => {
+    expect(() =>
+      validateBuildInputs({
+        ...production,
+        nativeRuntimeVersion: '1.0.0;unsafe',
+      }),
+    ).toThrow(/semantic version/);
+  });
+
   it('defers app-version comparison during trusted pre-checkout validation', () => {
     expect(
       validateBuildInputs({
@@ -80,6 +103,7 @@ describe('build input contract (TC-D07)', () => {
         tag: 'v1.0.1',
         githubRef: 'refs/tags/v1.0.1',
         appVersion: null,
+        nativeRuntimeVersion: null,
       }),
     ).toMatchObject({ version: '1.0.1', profile: 'production' });
   });

@@ -31,10 +31,10 @@ export interface FlinkNativeMockController {
   ): void;
 }
 
-function notImplemented<Result>(operation: string): Promise<Result> {
+function missingOverride<Result>(operation: string): Promise<Result> {
   return Promise.reject(
     new FlinkNativeError({
-      code: 'NOT_IMPLEMENTED',
+      code: 'E_TEST_OVERRIDE_REQUIRED',
       operation,
       recoverable: false,
       detail: 'Provide an explicit test override for this operation.',
@@ -73,33 +73,33 @@ export function createFlinkNativeMock(
     nativeRuntimeSignature: runtimeInfo.nativeRuntimeSignature,
     getRuntimeInfo: options.getRuntimeInfo ?? (async () => runtimeInfo),
     initializeLibrary:
-      options.initializeLibrary ?? (() => notImplemented('initializeLibrary')),
-    scanLibrary: options.scanLibrary ?? (() => notImplemented('scanLibrary')),
+      options.initializeLibrary ?? (() => missingOverride('initializeLibrary')),
+    scanLibrary: options.scanLibrary ?? (() => missingOverride('scanLibrary')),
     presentImportPicker:
       options.presentImportPicker ??
-      (() => notImplemented('presentImportPicker')),
+      (() => missingOverride('presentImportPicker')),
     cancelImport:
-      options.cancelImport ?? (() => notImplemented('cancelImport')),
+      options.cancelImport ?? (() => missingOverride('cancelImport')),
     renameDocument:
-      options.renameDocument ?? (() => notImplemented('renameDocument')),
+      options.renameDocument ?? (() => missingOverride('renameDocument')),
     deleteDocument:
-      options.deleteDocument ?? (() => notImplemented('deleteDocument')),
+      options.deleteDocument ?? (() => missingOverride('deleteDocument')),
     requestThumbnail:
-      options.requestThumbnail ?? (() => notImplemented('requestThumbnail')),
+      options.requestThumbnail ?? (() => missingOverride('requestThumbnail')),
     cancelThumbnail:
-      options.cancelThumbnail ?? (() => notImplemented('cancelThumbnail')),
+      options.cancelThumbnail ?? (() => missingOverride('cancelThumbnail')),
     getCapabilities:
-      options.getCapabilities ?? (() => notImplemented('getCapabilities')),
+      options.getCapabilities ?? (() => missingOverride('getCapabilities')),
     requestCameraPermission:
       options.requestCameraPermission ??
-      (() => notImplemented('requestCameraPermission')),
+      (() => missingOverride('requestCameraPermission')),
     startTracking:
-      options.startTracking ?? (() => notImplemented('startTracking')),
+      options.startTracking ?? (() => missingOverride('startTracking')),
     stopTracking:
-      options.stopTracking ?? (() => notImplemented('stopTracking')),
-    resetInput: options.resetInput ?? (() => notImplemented('resetInput')),
+      options.stopTracking ?? (() => missingOverride('stopTracking')),
+    resetInput: options.resetInput ?? (() => missingOverride('resetInput')),
     drainSamples:
-      options.drainSamples ?? (() => notImplemented('drainSamples')),
+      options.drainSamples ?? (() => missingOverride('drainSamples')),
     addListener: <EventName extends keyof FlinkNativeModuleEventMap>(
       eventName: EventName,
       listener: FlinkNativeModuleEventMap[EventName],
@@ -134,11 +134,11 @@ export function createFlinkPDFViewRefMock(
 ): FlinkPDFViewRef {
   return {
     openDocument:
-      overrides.openDocument ?? (() => notImplemented('openDocument')),
-    navigate: overrides.navigate ?? (() => notImplemented('navigate')),
+      overrides.openDocument ?? (() => missingOverride('openDocument')),
+    navigate: overrides.navigate ?? (() => missingOverride('navigate')),
     fitCurrentPage:
-      overrides.fitCurrentPage ?? (() => notImplemented('fitCurrentPage')),
+      overrides.fitCurrentPage ?? (() => missingOverride('fitCurrentPage')),
     closeDocument:
-      overrides.closeDocument ?? (() => notImplemented('closeDocument')),
+      overrides.closeDocument ?? (() => missingOverride('closeDocument')),
   };
 }

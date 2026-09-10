@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,6 +44,16 @@ export function validateBuildInputs(input) {
   const reason = requireText(input.reason, 'reason', 200);
   const githubRef = input.githubRef || '';
   const appVersion = input.appVersion || null;
+  const nativeRuntimeVersion = input.nativeRuntimeVersion || null;
+
+  if (
+    nativeRuntimeVersion &&
+    !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/.test(
+      nativeRuntimeVersion,
+    )
+  ) {
+    throw new BuildInputError('nativeRuntimeVersion must be a semantic version.');
+  }
 
   if (eventName !== 'push' && eventName !== 'workflow_dispatch') {
     throw new BuildInputError(`Unsupported workflow event: ${eventName}`);
@@ -79,6 +89,15 @@ export function validateBuildInputs(input) {
       `Production tag version ${version} does not match Expo app version ${appVersion}.`,
     );
   }
+  if (
+    profile === 'development' &&
+    nativeRuntimeVersion &&
+    version !== nativeRuntimeVersion
+  ) {
+    throw new BuildInputError(
+      `Development tag version ${version} does not match native runtime version ${nativeRuntimeVersion}.`,
+    );
+  }
 
   return {
     eventName,
@@ -93,15 +112,19 @@ export function validateBuildInputs(input) {
 async function run() {
   const argumentsProvided = process.argv.slice(2);
   const unknownArgument = argumentsProvided.find(
-    (value) => value !== '--skip-app-version',
+    (value) => value !== '--skip-app-version' && value !== '--github-output',
   );
   if (unknownArgument) {
     throw new BuildInputError(`Unknown option: ${unknownArgument}`);
   }
   const skipAppVersion = argumentsProvided.includes('--skip-app-version');
-  const appJson = JSON.parse(
-    await readFile(path.join(PROJECT_ROOT, 'app.json'), 'utf8'),
-  );
+  const writeGithubOutput = argumentsProvided.includes('--github-output');
+  const [appJson, nativeRuntime] = await Promise.all([
+    readFile(path.join(PROJECT_ROOT, 'app.json'), 'utf8').then(JSON.parse),
+    readFile(path.join(PROJECT_ROOT, 'config', 'native-runtime.json'), 'utf8').then(
+      JSON.parse,
+    ),
+  ]);
   const result = validateBuildInputs({
     eventName: process.env.FLINK_EVENT_NAME,
     tag: process.env.FLINK_TAG,
@@ -109,7 +132,21 @@ async function run() {
     reason: process.env.FLINK_REASON,
     githubRef: process.env.FLINK_GITHUB_REF,
     appVersion: skipAppVersion ? null : appJson.expo?.version,
+    nativeRuntimeVersion: skipAppVersion
+      ? null
+      : nativeRuntime.nativeRuntimeVersion,
   });
+
+  if (writeGithubOutput) {
+    if (!process.env.GITHUB_OUTPUT) {
+      throw new BuildInputError('GITHUB_OUTPUT is required with --github-output.');
+    }
+    await appendFile(
+      process.env.GITHUB_OUTPUT,
+      `tag=${result.tag}\nprofile=${result.profile}\nversion=${result.version}\nnative_runtime_version=${nativeRuntime.nativeRuntimeVersion}\n`,
+      'utf8',
+    );
+  }
 
   // This output intentionally contains only validated, non-secret values.
   console.log(JSON.stringify(result, null, 2));

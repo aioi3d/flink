@@ -6,6 +6,7 @@ const {
   applyFlinkBaseConfig,
   applyFlinkInfoPlist,
   resolveBuildProfile,
+  resolveBuildMetadata,
   constants,
 } = flinkPlugin;
 
@@ -25,7 +26,7 @@ describe('Flink iOS config plugin', () => {
       orientation: 'default',
       userInterfaceStyle: 'automatic',
       ios: {
-        bundleIdentifier: 'com.local.flink',
+        bundleIdentifier: 'com.aioi.flink',
         deploymentTarget: '18.0',
         supportsTablet: true,
       },
@@ -34,6 +35,32 @@ describe('Flink iOS config plugin', () => {
     expect(
       applyFlinkBaseConfig({ ios: { bundleIdentifier: 'jp.example.flink' } }),
     ).toMatchObject({ ios: { bundleIdentifier: 'jp.example.flink' } });
+  });
+
+  it('validates and embeds non-secret native build metadata', () => {
+    const metadata = resolveBuildMetadata({
+      FLINK_NATIVE_RUNTIME_VERSION: '1.2.3-beta.1',
+      FLINK_NATIVE_RUNTIME_SIGNATURE: 'a'.repeat(64),
+      FLINK_SOURCE_COMMIT: 'b'.repeat(40),
+      FLINK_BUILD_NUMBER: '123.2',
+    });
+    const plist = applyFlinkInfoPlist({}, 'development', metadata);
+
+    expect(plist).toMatchObject({
+      FlinkNativeRuntimeVersion: '1.2.3-beta.1',
+      FlinkNativeRuntimeSignature: 'a'.repeat(64),
+      FlinkNativeSourceCommit: 'b'.repeat(40),
+      FlinkNativeBuildProfile: 'development',
+    });
+    expect(() =>
+      resolveBuildMetadata({ FLINK_NATIVE_RUNTIME_SIGNATURE: 'not-a-digest' }),
+    ).toThrow(/SHA-256/);
+    expect(() =>
+      resolveBuildMetadata({ FLINK_SOURCE_COMMIT: 'short' }),
+    ).toThrow(/commit id/);
+    expect(() =>
+      resolveBuildMetadata({ FLINK_BUILD_NUMBER: '1.2.3.4' }),
+    ).toThrow(/numeric components/);
   });
 
   it('adds only the bounded development LAN configuration', () => {
