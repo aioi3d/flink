@@ -25,7 +25,7 @@ npm ci
 npm run verify:local
 ```
 
-The source now targets development runtime `1.0.10`. Its signature and
+The source now targets development runtime `1.0.11`. Its signature and
 installed-build metadata are intentionally unresolved until the replacement
 IPA is built and its Release inputs are recorded. During this transition,
 `npm run native:check -- --profile development` must report `unresolved` with
@@ -46,10 +46,15 @@ from an opaque enumerator URL spelling. It retains the symbolic-link,
 fingerprint, coordinator, and physical-identity checks; device testing then
 confirmed rename succeeds. Runtime `1.0.10` removes the manual `ページ全体`
 zoom-reset control and its native bridge, while keeping automatic fitting when
-a document opens, a page changes, or the layout changes. This breaks the native
-view contract intentionally, so it raises the native API to 2. Build and install
-`dev-runtime-v1.0.10` to pick up the removal. Keep the earlier Release evidence
-as historical input.
+a document opens, an explicit page navigation occurs, or the layout changes.
+Runtime `1.0.11` automatically requests thumbnails for library entries, changes
+PDFKit to vertical continuous scrolling, and replaces the page-number text
+field plus `移動` button with a tappable page count that opens a page-number
+dialog. Previous/next remain available. Passive scrolling does not reset zoom
+or position, and all visible PDF pages have external actions disabled. These
+native behavior changes retain native API 2, but require a fresh runtime: build
+and install `dev-runtime-v1.0.11`. Keep the earlier Release evidence as
+historical input.
 
 Pushing a `dev-runtime-v*` tag alone does not start a native build. Production
 `v*` tags do trigger the production path, so do not create one until the

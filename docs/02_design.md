@@ -58,7 +58,7 @@ iPhone / iPad の Flink
 | 項目 | 担当 | 理由 |
 |---|---|---|
 | ファイル選択・security scope・コピー・名前変更・削除 | Swift | 3GBファイルをJSへ渡さず、OSのファイル協調を利用する。 |
-| PDF解釈・描画・ページ移動・fit | PDFKit / Swift | ローカルURLで開き、PDFViewの単一ページとズームを使う。[S-PDF][S-PDFDOC] |
+| PDF解釈・描画・ページ移動・fit | PDFKit / Swift | ローカルURLで開き、PDFViewの縦方向連続表示とズームを使う。[S-PDF][S-PDFDOC] |
 | 係数の取得・フレーム保持・カメラ制御 | ARKit / Swift | `.eyeBlinkLeft` / `.eyeBlinkRight`を取りこぼさず取得する。[S-AR][S-EYE-L][S-EYE-R] |
 | 係数から瞬きイベントへの判定 | TypeScript | Windowsで単体試験し、閾値・状態機械をdevelopment build再利用で改善する。 |
 | 最終的なページ変更の安全確認 | Swift + TypeScript | JSだけのactive判定に依存せず、古い読書セッションの操作をネイティブでも拒否する。 |
@@ -411,8 +411,8 @@ Documentsを公開すると他アプリも内容を扱えるため、Flinkのメ
 
 ## DES-THUMBNAIL — 遅延生成・キャッシュ
 
-- 初期一覧はプレースホルダーで表示し、可視項目と近い範囲だけ要求する。
-- 同時生成数は1。待ちキューを有界にし、画面外の未開始リクエストはキャンセルする。重複requestをまとめる。
+- 初期一覧はプレースホルダーで表示し、ライブラリに現れる各項目のpage 0サムネイルを手動操作なしで自動要求する。結果は完了した項目から反映し、キャッシュ済みのrevisionは再利用する。
+- 同時生成数は1。JS側は項目を直列に要求し、native側の待ちキューも有界にする。更新・離脱時は進行中requestをキャンセルし、重複requestをまとめる。全項目を`Promise.all`等で同時要求しない。
 - 表示中PDFと別の`PDFDocument`を使い、サムネイル用serial queue内でpage 0の`thumbnail(of:for:)`を生成する。PDFViewにattachしたオブジェクトを別threadへ持ち回らない。[S-THUMBNAIL]
 - 出力画像は長辺512px以内。ポイント／ピクセル／UIImage.scaleを区別し、意図せずRetina倍率を二重適用しない。
 - 自前decoded image cacheの上限は32MiB、ディスクキャッシュは128MiBを設計値とする。LRUで削除し、ファイル数だけでメモリを制限しない。PDFKit内部のメモリはこの上限の外であり、別途実測する。
@@ -424,8 +424,8 @@ Documentsを公開すると他アプリも内容を扱えるため、Flinkのメ
 
 ```swift
 // PDFViewの基本方針。重い文書生成は別queueで行う。
-pdfView.displayMode = .singlePage
-pdfView.displayDirection = .horizontal
+pdfView.displayMode = .singlePageContinuous
+pdfView.displayDirection = .vertical
 pdfView.displaysAsBook = false
 pdfView.usePageViewController(false, withViewOptions: nil)
 pdfView.autoScales = true
@@ -441,17 +441,17 @@ pdfView.autoScales = true
 
 ### 自動ページfit
 
-手動の「ページ全体」リセット操作は提供しない。ページ移動はネイティブの現在ページを正本として`page(at:)`と`go(to:)`で行い、ページ境界を確認する。移動後のレイアウトで現在ページのfit倍率を再計算し、`scaleFactorForSizeToFit`等の公開APIで適用する。[S-FIT]
+手動の「ページ全体」リセット操作は提供しない。前／次、ページ番号ダイアログ、瞬きによる明示的なページ移動は、ネイティブの現在ページを正本として`page(at:)`と`go(to:)`で行い、ページ境界を確認する。移動後のレイアウトで現在ページのfit倍率を再計算し、`scaleFactorForSizeToFit`等の公開APIで適用する。[S-FIT]
 
-portrait / landscapeやページサイズが混在する文書では、最初のページの倍率を使い回さない。layout更新後に適用し、ピンチ中の毎renderで`autoScales`を強制してユーザー倍率を壊さない。回転・サイドバー切替は文書を再作成せず、現在ページを維持してfitする。
+portrait / landscapeやページサイズが混在する文書では、最初のページの倍率を使い回さない。open、明示的な移動、layout更新、lifecycle復帰後に適用し、ピンチ中の毎renderで`autoScales`を強制してユーザー倍率を壊さない。縦方向の連続スクロールで`PDFViewPageChanged`が届いた場合はfitを呼ばず、ユーザーの倍率とスクロール位置を維持する。回転・サイドバー切替は文書を再作成せず、現在ページを維持してfitする。
 
 ### ページ状態と描画完了
 
-`PDFViewPageChanged`通知から、現在ページ番号と`stateRevision`を更新する。これは論理上の現在ページの変化であり、全ピクセルの描画完了通知ではない。[S-PDF]
+`PDFViewPageChanged`通知から、現在ページ番号と`stateRevision`を更新する。縦方向の連続表示では、これは表示領域の中心に対応する論理上の現在ページの変化であり、全ピクセルの描画完了通知ではない。[S-PDF]
 
 `NavigateResult.applied`は「対象ページをPDFViewへ適用し、current pageを確認した」を意味する。大容量PDFの描画時間は別に測る。存在しない公開APIで`onRenderComplete`を捏造しない。自動Live Text等の不要な解析は、採用SDKに公開された制御APIがある場合に限り停止を検討し、private API / KVCで無効化しない。
 
-閲覧専用アプリとして、PDFリンクから外部URLや別文書を自動起動しない。PDFKitの公開delegate等で制御可能な範囲を確認し、外部遷移抑止をテストする。PDFフォーム編集、注釈作成、本文選択の独自機能は追加しない。
+閲覧専用アプリとして、PDFリンクから外部URLや別文書を自動起動しない。`PDFViewVisiblePagesChanged`で可視の全ページを監視し、外部アクションを無効化する。連続表示では隣接ページが現在ページより先に見えるため、現在ページだけに制限を掛けない。PDFKitの公開delegate等で制御可能な範囲を確認し、外部遷移抑止をテストする。PDFフォーム編集、注釈作成、本文選択の独自機能は追加しない。
 
 ## DES-NAVIGATION — ページ送りの直列化
 

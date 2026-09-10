@@ -2,8 +2,9 @@ import ExpoModulesCore
 import PDFKit
 import UIKit
 
-/// PDFKit-backed, one-page reader. File URLs are never accepted from JS: every
-/// open resolves a current DocumentRef through FlinkFilesRuntime first.
+/// PDFKit-backed, vertically continuous reader. File URLs are never accepted
+/// from JS: every open resolves a current DocumentRef through
+/// FlinkFilesRuntime first.
 @MainActor
 internal final class FlinkPDFView: ExpoView {
   let onViewReady = EventDispatcher()
@@ -352,8 +353,8 @@ internal final class FlinkPDFView: ExpoView {
   private func configurePDFView() {
     pdfView.translatesAutoresizingMaskIntoConstraints = true
     pdfView.backgroundColor = .clear
-    pdfView.displayMode = .singlePage
-    pdfView.displayDirection = .horizontal
+    pdfView.displayMode = .singlePageContinuous
+    pdfView.displayDirection = .vertical
     pdfView.displaysAsBook = false
     pdfView.displaysRTL = false
     pdfView.usePageViewController(false, withViewOptions: nil)
@@ -368,6 +369,12 @@ internal final class FlinkPDFView: ExpoView {
       self,
       selector: #selector(pdfPageChanged(_:)),
       name: .PDFViewPageChanged,
+      object: pdfView
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(pdfVisiblePagesChanged(_:)),
+      name: .PDFViewVisiblePagesChanged,
       object: pdfView
     )
     NotificationCenter.default.addObserver(
@@ -442,6 +449,7 @@ internal final class FlinkPDFView: ExpoView {
       pdfView.go(to: firstPage)
     }
     pdfView.layoutDocumentView()
+    disableExternalActionsOnVisiblePages()
     fitDisplayedPage()
     ignorePageChangeNotification = false
 
@@ -525,6 +533,7 @@ internal final class FlinkPDFView: ExpoView {
     disableExternalActions(on: page)
     pdfView.go(to: page)
     pdfView.layoutDocumentView()
+    disableExternalActionsOnVisiblePages()
     fitDisplayedPage()
     ignorePageChangeNotification = false
 
@@ -590,14 +599,21 @@ internal final class FlinkPDFView: ExpoView {
 
   /// Only same-document go-to actions are meaningful in this read-only view.
   /// Removing every other annotation action blocks URL/remote-document launch,
-  /// named actions such as print, and form reset without touching the file. The
-  /// scan stays page-local so opening a 10,000-page document remains bounded.
+  /// named actions such as print, and form reset without touching the file.
+  /// Continuous reading scans only pages that PDFKit is presenting, keeping the
+  /// work bounded even for very large documents.
   private func disableExternalActions(on page: PDFPage) {
     for annotation in page.annotations {
       if let action = annotation.action,
          !(action is PDFActionGoTo) {
         annotation.action = nil
       }
+    }
+  }
+
+  private func disableExternalActionsOnVisiblePages() {
+    for page in pdfView.visiblePages {
+      disableExternalActions(on: page)
     }
   }
 
@@ -695,9 +711,15 @@ internal final class FlinkPDFView: ExpoView {
       state: lifecycleIsSuspended ? .suspended : .ready
     )
     activeSnapshot = updated
-    fitDisplayedPage()
     emitPageChanged(updated)
     emitStateChanged(updated)
+  }
+
+  @objc private func pdfVisiblePagesChanged(_ notification: Notification) {
+    guard pdfView.document != nil else {
+      return
+    }
+    disableExternalActionsOnVisiblePages()
   }
 
   @objc private func applicationWillResignActive() {

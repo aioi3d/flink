@@ -80,7 +80,7 @@ Expo生成物を壊さず、iPadOS 18.6.2と後続のdevelopment build再利用�
 
 **P1-05：依存とローカルModule。** SDK互換の`expo-dev-client`を導入し、local Expo Moduleを`modules/flink-native`へ作る。autolinking、podspec、Swift module名を確定する。必要なnative依存をこの段階で洗い出し、後からUI小変更のために追加しない。[S-MODULES][S-DEV]
 
-**P1-06：型付き契約。** DES-CONTRACTSの`DocumentRef`、reader / tracking / generation / revision、エラー、native API v1を定義する。Native Adapterとmockの戻り値・エラーを同じ形にする。実機でnative moduleが見つからないときに、黙ってmockへfallbackしない。
+**P1-06：型付き契約。** DES-CONTRACTSの`DocumentRef`、reader / tracking / generation / revision、エラー、native APIを定義する。Native Adapterとmockの戻り値・エラーを同じ形にする。現行契約はAPI 2であり、実機でnative moduleが見つからないときに、黙ってmockへfallbackしない。
 
 **P1-07：純粋ドメインの単体試験。** 瞬きFSMのfixture、検索・ソート、表示ページ数変換、入力バリデーション、古いreader response拒否をテスト可能にする。状態機械の初期実装またはテスト用仕様を作り、Phase 4で同じテストを完成させる。
 
@@ -138,9 +138,9 @@ Phase 1の契約とローカル検証が完了していること。ユーザー�
 
 **P2-04：削除・rename・presenter。** coordinated write、revision検証、名前検証、キャッシュ無効化、読書中ファイルのrelinquish、外部削除／移動を実装する。provider callbackとmain間のデッドロックをレビューする。
 
-**P2-05：PDFView。** URLベース読込、単一ページ、前／次／番号移動、自動fit、mixed page size、回転、ロック・破損判定、readerSessionId、open requestキャンセル、command dedupeを実装する。手動のページ全体リセットは提供しない。非同期メソッドを単にmain上で巨大処理を行うラッパーにしない。
+**P2-05：PDFView。** URLベース読込、縦方向の連続表示、前／次、ページ数表示タップからの番号ダイアログ移動、自動fit、mixed page size、回転、ロック・破損判定、readerSessionId、open requestキャンセル、command dedupeを実装する。明示的な移動・open・layoutではfitするが、受動的なスクロールでのページ変更では倍率や位置をリセットしない。可視ページすべてで外部PDFアクションを無効化する。手動のページ全体リセットは提供しない。非同期メソッドを単にmain上で巨大処理を行うラッパーにしない。
 
-**P2-06：サムネイル。** page 0、生成1件、キャッシュ、遅延要求、キャンセル、reader優先・メモリ警告対応を実装する。
+**P2-06：サムネイル。** page 0、ライブラリ表示時の自動直列要求、生成1件、キャッシュ、キャンセル、reader優先・メモリ警告対応を実装する。
 
 **P2-07：FaceSessionCoordinator。** capability、カメラ許可、ARSession 1つ、左右係数、face identity、有界buffer、pull drain、native monotonic clock、watchdog、inactive停止を実装する。`isSupported`をtrueに固定したり機種名のハードコードで代用しない。
 
@@ -156,12 +156,12 @@ Phase 1の契約とローカル検証が完了していること。ユーザー�
 
 ```text
 [ ] Files: init / scan / picker / cancel / rename / delete / thumbnail が実装済み
-[ ] PDF: open / close / prev / next / jump / fit / notifications が実装済み
+[ ] PDF: open / close / vertical continuous scroll / prev / next / dialog jump / fit / visible-page action suppression / notifications が実装済み
 [ ] Face: permission / capability / start / stop / reset / drain が実装済み
 [ ] Face debug: 白背景・顔・目・口・表示OFF時の停止が実装済み
 [ ] lifecycle: inactive / background / JS reload / stale commands が扱われる
 [ ] app config: tablet / orientations / sharing / permissions / dev LAN が揃っている
-[ ] native API v1とTS型が一致する
+[ ] native API v2とTS型が一致する
 [ ] Expo / JS依存の導入はlockfileに反映済み
 [ ] local checksに失敗がない
 [ ] workflowにupload-artifact、EAS、Apple secret要求がない
@@ -253,7 +253,7 @@ FR-001〜FR-007が実装され、両実機でファイル経路、非PDF除外�
 
 ### 目的
 
-通常の両眼瞬きをページ操作へつなぎ、設定・ライフサイクル・adaptive UIを統合する。native API v1を維持したままTS中心で反復する。
+通常の両眼瞬きをページ操作へつなぎ、設定・ライフサイクル・adaptive UIを統合する。native API v2を維持したままTS中心で反復する。
 
 ### タスク
 
@@ -265,7 +265,7 @@ FR-001〜FR-007が実装され、両実機でファイル経路、非PDF除外�
 
 **P4-04：Lifecycle。** PDF openで自動開始、権限拒否時の手動閲覧、background停止、モーダル停止、顔ロスト後の再アーム、JS reload、PDF切替時の破棄を実装する。通常の開始ボタンを追加しない。
 
-**P4-05：Reader UI。** ピンチ、前／次、ページ番号入力、境界状態、ロード・エラー、追跡状態を仕上げる。手動のページ全体リセットは追加しない。ズーム中の瞬きも次ページで自動fitする。PDF本文検索や見開きを追加しない。
+**P4-05：Reader UI。** 縦スクロール、ピンチ、前／次、ページ数表示タップで開くページ番号ダイアログ、境界状態、ロード・エラー、追跡状態を仕上げる。手動のページ全体リセットは追加しない。ズーム中の瞬きや明示的な移動は移動先で自動fitする一方、受動的なスクロールでは倍率を維持する。PDF本文検索や見開きを追加しない。
 
 **P4-06：Settings。** モード切替、デバッグON/OFF、説明、runtime診断を作る。設定はプロセス内だけとし、切替時に判定途中の候補を破棄する。
 
@@ -360,15 +360,15 @@ FIX-07 / FIX-08 / FIX-09は端末空き容量に合わせて個別に試す。10
 | TC-F08 | Device | 読書中にFilesで対象を変更／削除／移動→瞬き停止、文書解放、理由表示。旧readerコマンドで別文書を操作しない。 |
 | TC-F09 | Local + Device | 日本語・数字を含む名前で検索／6種類のsort→正しい安定順。0件検索とライブラリ失敗は別表示。 |
 | TC-F10 | Local + Device | 削除取消／確定、rename、同名、空名、拡張子、パス入力、case-only変更、確認中の外部更新→非破壊・正しいエラー。 |
-| TC-F11 | Device | 初期はplaceholder→可視項目だけpage0 thumbnail。更新／rename／削除で無効化。cache削除後もPDFは残る。大量scroll後にcache上限へ収束。 |
+| TC-F11 | Device | 初期はplaceholder→ライブラリに表示された各項目のpage0 thumbnailを手動操作なしで順次表示。更新／rename／削除で無効化。cache削除後もPDFは残る。大量ライブラリで同時生成数とcache上限が守られる。 |
 
 ### PDF閲覧
 
 | ID | 環境 | 操作と期待結果 |
 |---|---|---|
 | TC-R01 | Device | 正常PDFを開く→PDFKitでpage0を表示。読込中に別PDFへ切替→古いopen完了で上書きしない。 |
-| TC-R02 | Local + Device | 前／次／ページ番号指定、先頭、最後、1ページPDF→境界を超えず番号変換が正しい。同一command再送は1回だけ。 |
-| TC-R03 | Device | ピンチ拡大中に瞬き／手動移動→次ページへ進みfit。混在サイズ、90度回転メタデータでも切れない。 |
+| TC-R02 | Local + Device | 前／次／ページ数表示をタップして開く番号ダイアログ、先頭、最後、1ページPDF→境界を超えず番号変換が正しい。同一command再送は1回だけ。 |
+| TC-R03 | Device | 縦方向にスクロールして複数ページを通過→現在ページ番号が追随し、倍率・位置がfitでリセットされない。ピンチ拡大中に瞬き／前次／番号ダイアログで明示移動→対象ページへ進みfit。混在サイズ、90度回転メタデータでも切れない。可視の隣接ページを含め外部PDFリンクが起動しない。 |
 | TC-R04 | Device | portrait / landscape、iPad sidebar開閉／幅変更→現在ページを維持してfit。文書の再読込・先頭戻りなし。 |
 | TC-R05 | Device | パスワード必須、空パスワード暗号化、破損、0ページ、消失→各仕様の表示。ロックは固定文言、パスワード入力なし、カメラ停止。 |
 | TC-R06 | Device | 数ページ読みmode変更→readerを閉じて再openするとpage0。プロセス再起動で設定初期化、PDF自体は残る。background往復だけなら現在ページ維持。 |

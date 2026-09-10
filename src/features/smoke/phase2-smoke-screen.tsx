@@ -16,11 +16,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { parseDisplayPageInput } from '@/domain/reader';
 
 import {
   FlinkFaceDebugView,
@@ -102,14 +103,12 @@ function LibraryRow({
   entry,
   thumbnailUri,
   onOpen,
-  onThumbnail,
   onRename,
   onDelete,
 }: {
   entry: LibraryEntry;
   thumbnailUri?: string;
   onOpen: () => void;
-  onThumbnail: () => void;
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -144,7 +143,6 @@ function LibraryRow({
         </View>
       </Pressable>
       <View style={styles.rowActions}>
-        <Button label="サムネイル" onPress={onThumbnail} />
         <Button label="名前変更" onPress={onRename} />
         <Button label="削除" danger onPress={onDelete} />
       </View>
@@ -169,6 +167,7 @@ function LibrarySmoke({
   const [importId, setImportId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  const thumbnailUrisRef = useRef<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     if (Platform.OS !== 'ios') {
@@ -260,20 +259,62 @@ function LibrarySmoke({
     }
   }, [importId]);
 
-  const requestThumbnail = useCallback(async (entry: LibraryEntry) => {
-    const requestId = makeToken('thumbnail');
-    try {
-      const result = await flinkNative.requestThumbnail(entry, requestId);
-      if (result.cacheUri) {
-        setThumbnails((current) => ({
-          ...current,
-          [`${entry.fileId}:${entry.revision}`]: result.cacheUri!,
-        }));
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+
+    const activeKeys = new Set(
+      entries.map((entry) => `${entry.fileId}:${entry.revision}`),
+    );
+    const retained = Object.fromEntries(
+      Object.entries(thumbnailUrisRef.current).filter(([key]) =>
+        activeKeys.has(key),
+      ),
+    );
+    thumbnailUrisRef.current = retained;
+    setThumbnails(retained);
+
+    let active = true;
+    let activeRequestId: string | null = null;
+    const loadThumbnails = async () => {
+      // Request sequentially: the native queue is deliberately bounded and
+      // serial so a large library cannot evict its own pending thumbnail work.
+      for (const entry of entries) {
+        const key = `${entry.fileId}:${entry.revision}`;
+        if (!active || thumbnailUrisRef.current[key]) continue;
+
+        const requestId = makeToken('thumbnail');
+        activeRequestId = requestId;
+        try {
+          const result = await flinkNative.requestThumbnail(entry, requestId);
+          if (!active || !result.cacheUri) continue;
+          const next = {
+            ...thumbnailUrisRef.current,
+            [key]: result.cacheUri,
+          };
+          thumbnailUrisRef.current = next;
+          setThumbnails(next);
+        } catch (caught) {
+          if (active) {
+            setError(diagnostic(caught, 'requestThumbnail'));
+          }
+        } finally {
+          if (activeRequestId === requestId) {
+            activeRequestId = null;
+          }
+        }
       }
-    } catch (caught) {
-      setError(diagnostic(caught, 'requestThumbnail'));
-    }
-  }, []);
+    };
+    void loadThumbnails();
+
+    return () => {
+      active = false;
+      const requestId = activeRequestId;
+      activeRequestId = null;
+      if (requestId) {
+        void flinkNative.cancelThumbnail(requestId).catch(() => undefined);
+      }
+    };
+  }, [entries]);
 
   const rename = useCallback(
     (entry: LibraryEntry) => {
@@ -384,7 +425,6 @@ function LibrarySmoke({
             entry={item}
             thumbnailUri={thumbnails[`${item.fileId}:${item.revision}`]}
             onOpen={() => onOpen(item)}
-            onThumbnail={() => void requestThumbnail(item)}
             onRename={() => rename(item)}
             onDelete={() => remove(item)}
           />
@@ -411,7 +451,6 @@ function ReaderSmoke({
   const [tracking, setTracking] = useState(false);
   const [debugVisible, setDebugVisible] = useState(false);
   const [pdfViewReady, setPdfViewReady] = useState(false);
-  const [jumpPage, setJumpPage] = useState('1');
   const [error, setError] = useState<string | null>(null);
   const { width } = useWindowDimensions();
 
@@ -429,7 +468,6 @@ function ReaderSmoke({
         openedSessionId = next.readerSessionId;
         if (effectIsCurrent && mountedRef.current) {
           setSnapshot(next);
-          setJumpPage(String(next.pageIndex + 1));
         } else {
           void view.closeDocument(next.readerSessionId).catch(() => undefined);
         }
@@ -496,7 +534,6 @@ function ReaderSmoke({
         });
         if (result) {
           setSnapshot(result.snapshot);
-          setJumpPage(String(result.snapshot.pageIndex + 1));
         }
       } catch (caught) {
         setError(diagnostic(caught, 'navigate'));
@@ -504,6 +541,38 @@ function ReaderSmoke({
     },
     [snapshot],
   );
+
+  const requestPageJump = useCallback(() => {
+    if (Platform.OS !== 'ios' || !snapshot || !Alert.prompt) return;
+
+    Alert.prompt(
+      'ページへ移動',
+      `1〜${snapshot.pageCount} のページ番号を入力してください。`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '移動',
+          isPreferred: true,
+          onPress: (input?: string) => {
+            const parsed = parseDisplayPageInput(
+              input ?? '',
+              snapshot.pageCount,
+            );
+            if (!parsed.ok) {
+              setError(
+                `E_PAGE_INPUT_INVALID: 1〜${snapshot.pageCount} の整数を入力してください。`,
+              );
+              return;
+            }
+            void navigate({ pageIndex: parsed.value });
+          },
+        },
+      ],
+      'plain-text',
+      String(snapshot.pageIndex + 1),
+      'number-pad',
+    );
+  }, [navigate, snapshot]);
 
   const startTracking = useCallback(async () => {
     if (!snapshot) return;
@@ -610,7 +679,6 @@ function ReaderSmoke({
                     }
                   : current,
               );
-              setJumpPage(String(nativeEvent.pageIndex + 1));
             }}
             onReaderError={({ nativeEvent }) => {
               setError(`${nativeEvent.error.code}: PDFを表示できません。`);
@@ -622,28 +690,27 @@ function ReaderSmoke({
               disabled={!snapshot || snapshot.pageIndex === 0}
               onPress={() => void navigate({ delta: -1 })}
             />
-            <TextInput
-              accessibilityLabel="移動先ページ"
-              keyboardType="number-pad"
-              onChangeText={setJumpPage}
-              onSubmitEditing={() => {
-                const page = Number(jumpPage);
-                if (Number.isInteger(page) && page >= 1) {
-                  void navigate({ pageIndex: page - 1 });
-                }
-              }}
-              style={styles.pageInput}
-              value={jumpPage}
-            />
-            <Button
-              label="移動"
-              onPress={() => {
-                const page = Number(jumpPage);
-                if (Number.isInteger(page) && page >= 1) {
-                  void navigate({ pageIndex: page - 1 });
-                }
-              }}
-            />
+            <Pressable
+              accessibilityHint="タップして移動先のページ番号を入力します。"
+              accessibilityLabel={
+                snapshot
+                  ? `現在のページ ${snapshot.pageIndex + 1} / ${snapshot.pageCount}`
+                  : '移動先ページを入力'
+              }
+              accessibilityRole="button"
+              disabled={!snapshot || Platform.OS !== 'ios'}
+              onPress={requestPageJump}
+              style={({ pressed }) => [
+                styles.pageJumpButton,
+                (!snapshot || Platform.OS !== 'ios') && styles.disabled,
+                pressed && snapshot && styles.pressed,
+              ]}>
+              <Text style={styles.pageJumpText}>
+                {snapshot
+                  ? `${snapshot.pageIndex + 1} / ${snapshot.pageCount}`
+                  : '— / —'}
+              </Text>
+            </Pressable>
             <Button
               label="次"
               disabled={
@@ -861,17 +928,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  pageInput: {
-    minWidth: 58,
+  pageJumpButton: {
+    minWidth: 78,
     minHeight: 36,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 9,
     backgroundColor: '#FFF',
-    color: colors.ink,
     paddingHorizontal: 9,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  pageJumpText: { color: colors.ink, fontWeight: '700' },
   debugScroll: {
     flex: 1,
     maxHeight: 420,

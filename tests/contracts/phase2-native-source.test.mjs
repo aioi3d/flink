@@ -277,23 +277,56 @@ describe('Phase 2 native source contract', () => {
     expect(thumbnailSource).toContain('pdf.page(at: 0)');
   });
 
-  it('loads PDFKit documents by URL and keeps automatic single-page fitting', () => {
+  it('loads PDFKit documents by URL and supports safe vertical continuous reading', () => {
     expect(pdfLoaderSource).toContain('PDFDocument(url:');
     expect(pdfLoaderSource).not.toContain('PDFDocument(data:');
-    expect(pdfViewSource).toContain('displayMode = .singlePage');
+    expect(pdfViewSource).toContain('displayMode = .singlePageContinuous');
+    expect(pdfViewSource).toContain('displayDirection = .vertical');
+    expect(pdfViewSource).not.toContain('displayDirection = .horizontal');
     expect(pdfViewSource).toContain('scaleFactorForSizeToFit');
     expect(pdfViewSource).toContain('recentCommandIds');
     expect(pdfViewSource).toContain('FlinkReaderContextBroker.shared');
-    expect(pdfViewSource).not.toContain('.singlePageContinuous');
     expect(pdfViewSource).toContain('private func fitDisplayedPage()');
     expect(pdfViewSource).toMatch(
       /let fit = pdfView\.scaleFactorForSizeToFit[\s\S]*?pdfView\.scaleFactor = fit/,
     );
+    expect(pdfViewSource).toContain('name: .PDFViewVisiblePagesChanged');
+    expect(pdfViewSource).toContain('for page in pdfView.visiblePages');
+    const passivePageChange = pdfViewSource.slice(
+      pdfViewSource.indexOf('@objc private func pdfPageChanged'),
+      pdfViewSource.indexOf('@objc private func applicationWillResignActive'),
+    );
+    expect(passivePageChange).not.toContain('fitDisplayedPage()');
     expect(moduleSource).not.toContain('AsyncFunction("fitCurrentPage")');
     expect(pdfViewSource).not.toContain('func fitCurrentPage(');
     expect(smokeScreenSource).not.toContain('fitCurrentPage');
     expect(smokeScreenSource).not.toContain('label="ページ全体"');
     expect(smokeScreenSource).not.toContain('styles.fitHelp');
+  });
+
+  it('automatically loads library thumbnails and opens page input from the page badge', () => {
+    const automaticThumbnails = smokeScreenSource.slice(
+      smokeScreenSource.indexOf('const activeKeys = new Set'),
+      smokeScreenSource.indexOf('const rename'),
+    );
+    expect(automaticThumbnails).toContain('for (const entry of entries)');
+    expect(automaticThumbnails).toContain(
+      'await flinkNative.requestThumbnail(entry, requestId)',
+    );
+    expect(automaticThumbnails).toContain(
+      'flinkNative.cancelThumbnail(requestId)',
+    );
+    expect(automaticThumbnails).not.toContain('Promise.all');
+    expect(smokeScreenSource).not.toContain('label="サムネイル"');
+    expect(smokeScreenSource).toContain(
+      "import { parseDisplayPageInput } from '@/domain/reader';",
+    );
+    expect(smokeScreenSource).toContain("Alert.prompt(\n      'ページへ移動'");
+    expect(smokeScreenSource).toContain('parseDisplayPageInput(');
+    expect(smokeScreenSource).not.toContain('<TextInput');
+    expect(smokeScreenSource).not.toContain('label="移動"');
+    expect(smokeScreenSource).toContain('label="前"');
+    expect(smokeScreenSource).toContain('label="次"');
   });
 
   it('waits for the mounted native view before opening a PDF', () => {
