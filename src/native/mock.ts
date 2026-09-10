@@ -136,8 +136,6 @@ export function createFlinkPDFViewRefMock(
     openDocument:
       overrides.openDocument ?? (() => missingOverride('openDocument')),
     navigate: overrides.navigate ?? (() => missingOverride('navigate')),
-    fitCurrentPage:
-      overrides.fitCurrentPage ?? (() => missingOverride('fitCurrentPage')),
     closeDocument:
       overrides.closeDocument ?? (() => missingOverride('closeDocument')),
   };

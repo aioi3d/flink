@@ -318,21 +318,6 @@ internal final class FlinkPDFView: ExpoView {
     ).wireValue
   }
 
-  func fitCurrentPage(_ readerSessionId: String) throws -> [String: Any] {
-    let operation = "fitCurrentPage"
-    guard isValidIdentifier(readerSessionId),
-          let snapshot = activeSnapshot,
-          snapshot.readerSessionId == readerSessionId,
-          pdfView.document != nil,
-          snapshot.state != .closed,
-          snapshot.state != .error else {
-      throw FlinkPDFErrors.changed(operation: operation)
-    }
-
-    fitDisplayedPage()
-    return snapshot.wireValue
-  }
-
   /// A stale cleanup is intentionally a no-op so an old React ref cannot close
   /// the document that replaced it.
   func closeDocument(_ readerSessionId: String) {

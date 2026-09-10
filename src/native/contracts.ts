@@ -5,7 +5,7 @@
  * share the exact same wire contract without loading a native runtime.
  */
 
-export const NATIVE_API_VERSION = 1 as const;
+export const NATIVE_API_VERSION = 2 as const;
 
 export type FileId = string;
 export type FileRevision = string;
@@ -192,7 +192,6 @@ export interface OpenDocumentInput {
 export interface FlinkPDFViewRef {
   openDocument(input: OpenDocumentInput): Promise<ReaderSnapshot>;
   navigate(input: NavigateRequest): Promise<NavigateResult>;
-  fitCurrentPage(readerSessionId: ReaderSessionId): Promise<ReaderSnapshot>;
   closeDocument(readerSessionId: ReaderSessionId): Promise<void>;
 }
 

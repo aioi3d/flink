@@ -138,7 +138,7 @@ Phase 1の契約とローカル検証が完了していること。ユーザー�
 
 **P2-04：削除・rename・presenter。** coordinated write、revision検証、名前検証、キャッシュ無効化、読書中ファイルのrelinquish、外部削除／移動を実装する。provider callbackとmain間のデッドロックをレビューする。
 
-**P2-05：PDFView。** URLベース読込、単一ページ、前／次／番号移動、fit、mixed page size、回転、ロック・破損判定、readerSessionId、open requestキャンセル、command dedupeを実装する。非同期メソッドを単にmain上で巨大処理を行うラッパーにしない。
+**P2-05：PDFView。** URLベース読込、単一ページ、前／次／番号移動、自動fit、mixed page size、回転、ロック・破損判定、readerSessionId、open requestキャンセル、command dedupeを実装する。手動のページ全体リセットは提供しない。非同期メソッドを単にmain上で巨大処理を行うラッパーにしない。
 
 **P2-06：サムネイル。** page 0、生成1件、キャッシュ、遅延要求、キャンセル、reader優先・メモリ警告対応を実装する。
 
@@ -265,7 +265,7 @@ FR-001〜FR-007が実装され、両実機でファイル経路、非PDF除外�
 
 **P4-04：Lifecycle。** PDF openで自動開始、権限拒否時の手動閲覧、background停止、モーダル停止、顔ロスト後の再アーム、JS reload、PDF切替時の破棄を実装する。通常の開始ボタンを追加しない。
 
-**P4-05：Reader UI。** ページ全体表示、ピンチ、前／次、ページ番号入力、境界状態、ロード・エラー、追跡状態を仕上げる。ズーム中の瞬きも次ページでfitする。PDF本文検索や見開きを追加しない。
+**P4-05：Reader UI。** ピンチ、前／次、ページ番号入力、境界状態、ロード・エラー、追跡状態を仕上げる。手動のページ全体リセットは追加しない。ズーム中の瞬きも次ページで自動fitする。PDF本文検索や見開きを追加しない。
 
 **P4-06：Settings。** モード切替、デバッグON/OFF、説明、runtime診断を作る。設定はプロセス内だけとし、切替時に判定途中の候補を破棄する。
 

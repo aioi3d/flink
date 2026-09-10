@@ -505,18 +505,6 @@ function ReaderSmoke({
     [snapshot],
   );
 
-  const fit = useCallback(async () => {
-    if (!snapshot) return;
-    try {
-      const next = await pdfRef.current?.fitCurrentPage(
-        snapshot.readerSessionId,
-      );
-      if (next) setSnapshot(next);
-    } catch (caught) {
-      setError(diagnostic(caught, 'fitCurrentPage'));
-    }
-  }, [snapshot]);
-
   const startTracking = useCallback(async () => {
     if (!snapshot) return;
     setError(null);
@@ -656,7 +644,6 @@ function ReaderSmoke({
                 }
               }}
             />
-            <Button label="ページ全体" onPress={() => void fit()} />
             <Button
               label="次"
               disabled={
@@ -665,9 +652,6 @@ function ReaderSmoke({
               onPress={() => void navigate({ delta: 1 })}
             />
           </View>
-          <Text style={styles.fitHelp}>
-            「ページ全体」は現在の1ページを画面内に収めるズームリセットです。
-          </Text>
         </View>
 
         <ScrollView
@@ -886,14 +870,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     color: colors.ink,
     paddingHorizontal: 9,
-    textAlign: 'center',
-  },
-  fitHelp: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: colors.card,
-    color: colors.secondary,
-    fontSize: 11,
     textAlign: 'center',
   },
   debugScroll: {

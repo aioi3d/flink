@@ -204,10 +204,6 @@ public final class FlinkNativeModule: Module {
         (view: FlinkPDFView, request: FlinkNavigateRequestRecord) async throws -> [String: Any] in
         try await view.navigate(request)
       }
-      AsyncFunction("fitCurrentPage") {
-        (view: FlinkPDFView, readerSessionId: String) async throws -> [String: Any] in
-        try await view.fitCurrentPage(readerSessionId)
-      }
       AsyncFunction("closeDocument") {
         (view: FlinkPDFView, readerSessionId: String) async -> Void in
         await view.closeDocument(readerSessionId)

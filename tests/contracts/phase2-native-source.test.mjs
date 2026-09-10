@@ -88,7 +88,6 @@ describe('Phase 2 native source contract', () => {
       'drainSamples',
       'openDocument',
       'navigate',
-      'fitCurrentPage',
       'closeDocument',
     ]) {
       expect(moduleSource).toContain(`AsyncFunction("${name}")`);
@@ -278,7 +277,7 @@ describe('Phase 2 native source contract', () => {
     expect(thumbnailSource).toContain('pdf.page(at: 0)');
   });
 
-  it('loads PDFKit documents by URL and provides single-page native navigation', () => {
+  it('loads PDFKit documents by URL and keeps automatic single-page fitting', () => {
     expect(pdfLoaderSource).toContain('PDFDocument(url:');
     expect(pdfLoaderSource).not.toContain('PDFDocument(data:');
     expect(pdfViewSource).toContain('displayMode = .singlePage');
@@ -286,16 +285,15 @@ describe('Phase 2 native source contract', () => {
     expect(pdfViewSource).toContain('recentCommandIds');
     expect(pdfViewSource).toContain('FlinkReaderContextBroker.shared');
     expect(pdfViewSource).not.toContain('.singlePageContinuous');
-    expect(pdfViewSource).toMatch(
-      /func fitCurrentPage[\s\S]*?fitDisplayedPage\(\)/,
-    );
+    expect(pdfViewSource).toContain('private func fitDisplayedPage()');
     expect(pdfViewSource).toMatch(
       /let fit = pdfView\.scaleFactorForSizeToFit[\s\S]*?pdfView\.scaleFactor = fit/,
     );
-    expect(smokeScreenSource).toContain('label="ページ全体"');
-    expect(smokeScreenSource).toContain(
-      '現在の1ページを画面内に収めるズームリセットです。',
-    );
+    expect(moduleSource).not.toContain('AsyncFunction("fitCurrentPage")');
+    expect(pdfViewSource).not.toContain('func fitCurrentPage(');
+    expect(smokeScreenSource).not.toContain('fitCurrentPage');
+    expect(smokeScreenSource).not.toContain('label="ページ全体"');
+    expect(smokeScreenSource).not.toContain('styles.fitHelp');
   });
 
   it('waits for the mounted native view before opening a PDF', () => {

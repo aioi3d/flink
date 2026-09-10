@@ -250,7 +250,6 @@ export interface NavigateResult {
 export interface FlinkPDFViewRef {
   openDocument(input: { openRequestId: string; document: DocumentRef }): Promise<ReaderSnapshot>;
   navigate(input: NavigateRequest): Promise<NavigateResult>;
-  fitCurrentPage(readerSessionId: ReaderSessionId): Promise<ReaderSnapshot>;
   closeDocument(readerSessionId: ReaderSessionId): Promise<void>;
 }
 ```
@@ -440,9 +439,9 @@ pdfView.autoScales = true
 
 各open requestにUUIDを付け、遅いAの読込が新しいBの選択を上書きしない。キャンセル・離脱後に完了したAは破棄する。parse待ちのreaderには戻る操作を残すが、PDFKit内部呼出しの即時キャンセルを保証しない。
 
-### ページ全体表示
+### 自動ページfit
 
-ページ移動はネイティブの現在ページを正本として`page(at:)`と`go(to:)`で行い、ページ境界を確認する。移動後のレイアウトで現在ページのfit倍率を再計算し、`scaleFactorForSizeToFit`等の公開APIで適用する。[S-FIT]
+手動の「ページ全体」リセット操作は提供しない。ページ移動はネイティブの現在ページを正本として`page(at:)`と`go(to:)`で行い、ページ境界を確認する。移動後のレイアウトで現在ページのfit倍率を再計算し、`scaleFactorForSizeToFit`等の公開APIで適用する。[S-FIT]
 
 portrait / landscapeやページサイズが混在する文書では、最初のページの倍率を使い回さない。layout更新後に適用し、ピンチ中の毎renderで`autoScales`を強制してユーザー倍率を壊さない。回転・サイドバー切替は文書を再作成せず、現在ページを維持してfitする。
 
@@ -820,7 +819,7 @@ Fast Refreshで十分な変更と、JS reloadが必要な変更を区別する�
 
 ### ネイティブ互換性管理
 
-`nativeApiVersion = 1`を最初の契約版とする。APIの削除・意味変更は版を上げ、JSが要求する版と一致しない場合は明示的な診断を出す。
+`nativeApiVersion = 2`を現行の契約版とする。初期の契約版1から手動の`fitCurrentPage` APIを削除したため2へ上げた。APIの削除・意味変更は版を上げ、JSが要求する版と一致しない場合は明示的な診断を出す。
 
 `nativeRuntimeSignature`はnative source、ローカルmodule設定、autolinking対象のnative packageの解決版、native影響のあるExpo設定、config plugin、toolchain指定、native lock等から計算する。機械依存の絶対パスや生成済みbuild metadataは入力から除く。生成metadataをhash入力に含めて自己参照ループを作らない。
 
