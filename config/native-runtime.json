@@ -7,13 +7,11 @@
     "inputVersion": 1,
     "recordedSignature": null,
     "recordedSignatures": {
-      "development": null,
+      "development": "a04edf0d25d4a23db15348a3c8494b0bde37593b0d6eaa3a0bb762042bb4b4aa",
       "production": null
     },
-    "resolutionStatus": "unresolved",
-    "unresolvedReasons": [
-      "The macOS build resolved a Pod lock, but Release publication failed before Podfile.lock and native-build-info.json could be retrieved and recorded locally."
-    ]
+    "resolutionStatus": "resolved",
+    "unresolvedReasons": []
   },
   "nativePackageAllowlist": [
     "@expo/cli",
@@ -106,7 +104,7 @@
   "installedBuildInfo": {
     "defaultPath": "config/installed-native-build-info.json",
     "isSignatureInput": false,
-    "status": "not-provided"
+    "status": "provided"
   },
   "generatedMetadataBasenames": [
     "native-build-info.json",

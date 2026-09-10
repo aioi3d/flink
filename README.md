@@ -25,21 +25,18 @@ npm ci
 npm run verify:local
 ```
 
-`native:check` intentionally reports `unresolved` until the first successful
-macOS build supplies a real `Podfile.lock` and `native-build-info.json`.
+The development runtime is pinned to the CI-verified `dev-runtime-v1.0.4`
+inputs. A plain `npm run native:check` now infers the installed development
+profile and must report `compatible`; use `--profile production` only when
+preparing a production runtime.
 
-## First development IPA
+## Development IPA status
 
-1. Commit and push the reviewed Phase 2 source.
-2. Create and push an existing-commit tag such as `dev-runtime-v1.0.4`.
-3. Manually run the **iOS unsigned IPA** workflow with that tag,
-   `profile=development`, and a short reason.
-4. Download the unsigned IPA, `SHA256SUMS.txt`, `native-build-info.json`, and
-   `Podfile.lock` from the tag's GitHub Release. Preserve the latter two as
-   `config/installed-native-build-info.json` and
-   `native-locks/ios/Podfile.lock` for the follow-up signature update.
-5. Re-sign/install the IPA with SideStore or an equivalent tool, then run the
-   smoke checklist on both iPhone and iPad and retain the workflow/device log.
+The `dev-runtime-v1.0.4` workflow completed successfully. Its resolved
+`Podfile.lock`, build metadata, and development signature are recorded in this
+checkout. Next, re-sign/install `Flink-dev-runtime-1.0.4-unsigned.ipa` with
+SideStore or an equivalent tool, then run the smoke checklist on both iPhone
+and iPad and retain the workflow/device log.
 
 Pushing a `dev-runtime-v*` tag alone does not start a native build. Production
 `v*` tags do trigger the production path, so do not create one until the

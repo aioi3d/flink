@@ -39,6 +39,10 @@ function parseArguments(values) {
   return options;
 }
 
+function isBuildProfile(value) {
+  return value === 'development' || value === 'production';
+}
+
 async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'));
 }
@@ -48,10 +52,25 @@ async function readOptionalJson(filePath) {
     return await readJson(filePath);
   } catch (error) {
     if (error && typeof error === 'object' && error.code === 'ENOENT') {
-      return null;
+      return undefined;
     }
     throw error;
   }
+}
+
+function validateInstalledMetadata(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Installed native build metadata must be a JSON object.');
+  }
+  if (!isBuildProfile(value.buildProfile)) {
+    throw new Error(
+      'Installed native build profile must be development or production.',
+    );
+  }
+  return value;
 }
 
 try {
@@ -59,20 +78,27 @@ try {
   const runtime = await readJson(
     path.join(DEFAULT_PROJECT_ROOT, 'config', 'native-runtime.json'),
   );
+  const installedPath = path.resolve(
+    DEFAULT_PROJECT_ROOT,
+    options.installedPath ?? runtime.installedBuildInfo?.defaultPath,
+  );
+  const installed = validateInstalledMetadata(await readOptionalJson(installedPath));
+  const environmentProfile = process.env.FLINK_BUILD_PROFILE;
+  if (environmentProfile !== undefined && !isBuildProfile(environmentProfile)) {
+    throw new Error('FLINK_BUILD_PROFILE must be development or production.');
+  }
   const calculated = await calculateNativeSignature({
     buildProfile:
-      options.buildProfile ?? process.env.FLINK_BUILD_PROFILE ?? 'production',
+      options.buildProfile ??
+      environmentProfile ??
+      installed?.buildProfile ??
+      'production',
   });
   const buildProfile = calculated.manifest.buildProfile;
   const configuredSignature =
     runtime.signature?.recordedSignatures?.[buildProfile] ??
     runtime.signature?.recordedSignature ??
     null;
-  const installedPath = path.resolve(
-    DEFAULT_PROJECT_ROOT,
-    options.installedPath ?? runtime.installedBuildInfo?.defaultPath,
-  );
-  const installed = await readOptionalJson(installedPath);
 
   const mismatches = [];
   for (const reason of calculated.unresolvedReasons) {
@@ -83,7 +109,7 @@ try {
   if (configuredSignature && configuredSignature !== calculated.signature) {
     mismatches.push('The recorded native signature does not match current native inputs.');
   }
-  if (installed) {
+  if (installed !== undefined) {
     if (installed.nativeApiVersion !== runtime.nativeApiVersion) {
       mismatches.push('The installed runtime native API version is incompatible.');
     }
@@ -103,7 +129,9 @@ try {
       ? runtime.signature.unresolvedReasons ?? []
       : []),
     ...calculated.unresolvedReasons,
-    ...(!installed ? ['Installed native build metadata was not provided.'] : []),
+    ...(installed === undefined
+      ? ['Installed native build metadata was not provided.']
+      : []),
   ];
   const status =
     mismatches.length > 0
@@ -118,7 +146,7 @@ try {
     buildProfile,
     nativeRuntimeSignature: calculated.signature,
     inputCount: calculated.manifest.inputs.length,
-    installedMetadataPresent: Boolean(installed),
+    installedMetadataPresent: installed !== undefined,
     unresolvedReasons: [...new Set(unresolvedReasons)].sort(),
     mismatches,
   };
