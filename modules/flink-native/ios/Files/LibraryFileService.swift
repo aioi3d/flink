@@ -422,7 +422,11 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
             values.isDirectory == false,
             values.isSymbolicLink == false
       else {
-        throw FlinkFilesException(.pathOutsideLibrary, operation: operation)
+        throw FlinkFilesException(
+          .pathOutsideLibrary,
+          operation: operation,
+          diagnostic: FlinkPathDiagnostic.resolveSourceKind.rawValue
+        )
       }
       let relativePath = try FlinkPathSafety.relativePath(of: indexed.url, within: paths.library)
       let sizeBytes = Int64(values.fileSize ?? 0)
@@ -730,7 +734,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "coordinated-source-kind"
+        diagnostic: FlinkPathDiagnostic.coordinatedSourceKind.rawValue
       )
     }
     let fingerprint = metadataFingerprint(
@@ -767,14 +771,14 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "coordinated-library-kind"
+        diagnostic: FlinkPathDiagnostic.coordinatedLibraryKind.rawValue
       )
     }
     guard try posixIdentity(of: candidate, operation: operation) == expectedIdentity else {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "coordinated-library-identity"
+        diagnostic: FlinkPathDiagnostic.coordinatedLibraryIdentity.rawValue
       )
     }
   }
@@ -793,7 +797,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "coordinated-parent-kind"
+        diagnostic: FlinkPathDiagnostic.coordinatedParentKind.rawValue
       )
     }
     guard try isSameFileSystemResource(
@@ -805,7 +809,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "coordinated-parent-identity"
+        diagnostic: FlinkPathDiagnostic.coordinatedParentIdentity.rawValue
       )
     }
   }
@@ -826,7 +830,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "invalid-relative-components"
+        diagnostic: FlinkPathDiagnostic.coordinatedInvalidRelativeComponents.rawValue
       )
     }
     return components
@@ -852,7 +856,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "coordinated-path-containment"
+        diagnostic: FlinkPathDiagnostic.coordinatedPathContainment.rawValue
       )
     }
 
@@ -868,7 +872,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
         throw FlinkFilesException(
           .pathOutsideLibrary,
           operation: operation,
-          diagnostic: "coordinated-path-symlink"
+          diagnostic: FlinkPathDiagnostic.coordinatedPathSymbolicLink.rawValue
         )
       }
     }
@@ -1028,7 +1032,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw FlinkFilesException(
         .pathOutsideLibrary,
         operation: operation,
-        diagnostic: "non-file-identity-url"
+        diagnostic: FlinkPathDiagnostic.nonFileIdentityURL.rawValue
       )
     }
     var status = stat()

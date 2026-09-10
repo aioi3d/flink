@@ -54,6 +54,42 @@ const RECOVERABLE_NATIVE_CODES = new Set([
   'ERR_VIEW_NOT_FOUND',
 ]);
 
+const PATH_OUTSIDE_LIBRARY_DIAGNOSTICS = {
+  'path.v1.resolve-source-kind':
+    '事前確認で、対象が通常のファイルではないか、リンク状態を確認できませんでした。',
+  'path.v1.relative-path-outside-root':
+    '事前確認で、対象の位置がライブラリ直下として確認できませんでした。',
+  'path.v1.relative-path-invalid-component':
+    '事前確認で、対象の相対パスに使用できない要素が見つかりました。',
+  'path.v1.path-outside-root':
+    '事前確認で、対象がライブラリの外側として解決されました。',
+  'path.v1.path-root-symbolic-link':
+    '事前確認で、ライブラリのルートがリンクとして検出されました。',
+  'path.v1.path-descendant-symbolic-link':
+    '事前確認で、対象までの経路にリンクが検出されました。',
+  'path.v1.coordinated-source-kind':
+    '操作中の再検証で、対象ファイルの種別またはリンク状態を確認できませんでした。',
+  'path.v1.coordinated-library-kind':
+    '操作中の再検証で、ライブラリのルートをディレクトリとして確認できませんでした。',
+  'path.v1.coordinated-library-identity':
+    '操作中に、ライブラリのルートが開始時と同じ場所ではなくなりました。',
+  'path.v1.coordinated-parent-kind':
+    '操作中の再検証で、親フォルダの種別またはリンク状態を確認できませんでした。',
+  'path.v1.coordinated-parent-identity':
+    '操作中に、親フォルダが開始時に確認した場所と一致しなくなりました。',
+  'path.v1.coordinated-invalid-relative-components':
+    '操作中の再検証で、対象の相対位置を安全に再構成できませんでした。',
+  'path.v1.coordinated-path-containment':
+    '操作中の再検証で、対象がライブラリ内にあることを確認できませんでした。',
+  'path.v1.coordinated-path-symbolic-link':
+    '操作中の再検証で、対象までの経路にリンクが検出されました。',
+  'path.v1.non-file-identity-url':
+    '操作中の再検証で、ファイルURLとしての同一性を確認できませんでした。',
+} as const;
+
+type PathOutsideLibraryDiagnostic =
+  keyof typeof PATH_OUTSIDE_LIBRARY_DIAGNOSTICS;
+
 export class FlinkNativeError extends Error implements FlinkError {
   readonly code: string;
   readonly operation: string;
@@ -102,6 +138,75 @@ function readNativeCode(error: unknown): string | null {
   return typeof code === 'string' && code.length > 0 ? code : null;
 }
 
+function readNativeMessage(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) {
+    return null;
+  }
+
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : null;
+}
+
+function isPathOutsideLibraryDiagnostic(
+  value: string,
+): value is PathOutsideLibraryDiagnostic {
+  return Object.prototype.hasOwnProperty.call(
+    PATH_OUTSIDE_LIBRARY_DIAGNOSTICS,
+    value,
+  );
+}
+
+/**
+ * Accepts only the exact, native-owned diagnostic envelope. Native messages
+ * otherwise stay private because they can contain a path or other document data.
+ */
+function readSafePathOutsideLibraryDiagnostic(
+  error: unknown,
+  operation: string,
+  code: string,
+): PathOutsideLibraryDiagnostic | undefined {
+  if (code !== 'E_PATH_OUTSIDE_LIBRARY') {
+    return undefined;
+  }
+
+  const message = readNativeMessage(error);
+  const directMatch = message?.match(
+    /^operation=([A-Za-z][A-Za-z0-9]*);diagnostic=(path\.v1\.[a-z0-9-]+)$/,
+  );
+  const wrappedMatch = message?.match(
+    /^FunctionCallException: Calling the '([A-Za-z][A-Za-z0-9]*)' function has failed \(at [^\r\n]+\)\r?\n→ Caused by: operation=([A-Za-z][A-Za-z0-9]*);diagnostic=(path\.v1\.[a-z0-9-]+)$/,
+  );
+  const diagnostic = directMatch?.[2] ?? wrappedMatch?.[3];
+  const nativeOperation = directMatch?.[1] ?? wrappedMatch?.[2];
+  const wrapperOperation = wrappedMatch?.[1];
+  if (
+    !diagnostic ||
+    nativeOperation !== operation ||
+    (wrapperOperation !== undefined && wrapperOperation !== operation) ||
+    !isPathOutsideLibraryDiagnostic(diagnostic)
+  ) {
+    return undefined;
+  }
+  return diagnostic;
+}
+
+/** Formats a user-visible error without ever echoing a raw native message. */
+export function formatNativeErrorForDisplay(error: FlinkNativeError): string {
+  const detail = error.detail;
+  const diagnostic =
+    error.code === 'E_PATH_OUTSIDE_LIBRARY' &&
+    typeof detail === 'string' &&
+    isPathOutsideLibraryDiagnostic(detail)
+      ? detail
+      : undefined;
+  if (!diagnostic) {
+    return `${error.code}: ${error.message}`;
+  }
+  return `${error.code}: ${error.message}\n診断: ${
+    PATH_OUTSIDE_LIBRARY_DIAGNOSTICS[diagnostic]
+  } (${diagnostic})`;
+}
+
 /**
  * Normalizes bridge failures without copying arbitrary native messages. Those
  * messages may contain an absolute sandbox path or document metadata.
@@ -119,9 +224,11 @@ export function normalizeNativeError(
   }
 
   const code = readNativeCode(error) ?? 'E_NATIVE_UNKNOWN';
+  const detail = readSafePathOutsideLibraryDiagnostic(error, operation, code);
   return new FlinkNativeError({
     code,
     operation,
     recoverable: RECOVERABLE_NATIVE_CODES.has(code),
+    ...(detail === undefined ? {} : { detail }),
   });
 }

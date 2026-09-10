@@ -151,13 +151,14 @@ describe('Phase 2 native source contract', () => {
       /coordinatedLibraryRoot: URL,[\s\S]*?validatedRelativePathComponents\([\s\S]*?coordinatedURL\([\s\S]*?assertNoCoordinatedSymbolicLink\(/,
     );
     expect(filesSource).toMatch(
-      /coordinatedParent,[\s\S]*?rootedParent,[\s\S]*?coordinated-parent-identity/,
+      /coordinatedParent,[\s\S]*?rootedParent,/,
     );
+    expect(filesTypesSource).toContain('path.v1.coordinated-parent-identity');
     expect(filesSource).toMatch(
       /coordinatedSource,[\s\S]*?rootedSource,[\s\S]*?fileChanged/,
     );
     expect(filesSource).toMatch(
-      /coordinated-library-kind[\s\S]*?coordinated-library-identity/,
+      /FlinkPathDiagnostic\.coordinatedLibraryKind[\s\S]*?FlinkPathDiagnostic\.coordinatedLibraryIdentity/,
     );
     expect(filesSource).toMatch(
       /let coordinatedDestination = mutationURLs\.sourceParent[\s\S]*?appendingPathComponent\(newName, isDirectory: false\)/,
@@ -184,7 +185,9 @@ describe('Phase 2 native source contract', () => {
     expect(coordinatorRevalidation).toContain('usesPromisedItemResourceValues: true');
     expect(coordinatorRevalidation).toContain('source: coordinatedSource');
     expect(coordinatorRevalidation).toContain('sourceParent: coordinatedParent');
-    expect(coordinatorRevalidation).toContain('coordinated-parent-kind');
+    expect(coordinatorRevalidation).toContain(
+      'FlinkPathDiagnostic.coordinatedParentKind',
+    );
     expect(coordinatorRevalidation).toContain('values.isSymbolicLink == false');
     expect(filesSource).toContain('includingPropertiesForKeys: nil');
     expect(filesTypesSource).toContain('guard values.isSymbolicLink == false');
@@ -206,6 +209,23 @@ describe('Phase 2 native source contract', () => {
     expect(identityHelper).toContain('device: UInt64(status.st_dev)');
     expect(identityHelper).toContain('inode: UInt64(status.st_ino)');
     expect(identityHelper).not.toContain('FlinkResourceIdentity.hashed');
+  });
+
+  it('uses fixed, path-free diagnostics for every path-boundary rejection', () => {
+    expect(filesTypesSource).toContain('internal enum FlinkPathDiagnostic');
+    expect(filesTypesSource).toContain('override var debugDescription');
+    expect(filesTypesSource).toContain('return FlinkFilesException(');
+    expect(filesTypesSource).toContain('diagnostic: FlinkPathDiagnostic.relativePathOutsideRoot.rawValue');
+    expect(filesTypesSource).toContain('diagnostic: FlinkPathDiagnostic.relativePathInvalidComponent.rawValue');
+    expect(filesTypesSource).toContain('diagnostic: FlinkPathDiagnostic.pathOutsideRoot.rawValue');
+    expect(filesTypesSource).toContain('diagnostic: FlinkPathDiagnostic.pathRootSymbolicLink.rawValue');
+    expect(filesTypesSource).toContain('diagnostic: FlinkPathDiagnostic.pathDescendantSymbolicLink.rawValue');
+    expect(filesSource).toContain('diagnostic: FlinkPathDiagnostic.resolveSourceKind.rawValue');
+    expect(filesSource).toContain('diagnostic: FlinkPathDiagnostic.coordinatedSourceKind.rawValue');
+    expect(filesSource).toContain('diagnostic: FlinkPathDiagnostic.coordinatedParentIdentity.rawValue');
+    expect(filesSource).toContain('diagnostic: FlinkPathDiagnostic.nonFileIdentityURL.rawValue');
+    expect(smokeScreenSource).toContain('formatNativeErrorForDisplay(normalized)');
+    expect(smokeScreenSource).not.toContain('caught.message');
   });
 
   it('keeps thumbnail work serial, bounded, cancellable, and pressure-aware', () => {

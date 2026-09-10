@@ -25,7 +25,7 @@ npm ci
 npm run verify:local
 ```
 
-The source now targets development runtime `1.0.7`. Its signature and
+The source now targets development runtime `1.0.8`. Its signature and
 installed-build metadata are intentionally unresolved until the replacement
 IPA is built and its Release inputs are recorded. During this transition,
 `npm run native:check -- --profile development` must report `unresolved` with
@@ -38,12 +38,12 @@ still rejected rename with `E_PATH_OUTSIDE_LIBRARY`. The remaining coordinator
 path used ordinary resource-value APIs inside a `.forMoving` accessor and
 reconstructed containment from an accessor URL whose spelling is not stable.
 Runtime `1.0.7` uses Foundation's promised-item resource values and coordinated
-source, parent, and library-root intents. It proves containment by rebuilding
-the indexed relative components below the coordinated root, then performs the
-mutation only through the current source/parent intent URLs. It keeps
-fail-closed containment, symlink, identity, and no-replace checks. Build and
-install `dev-runtime-v1.0.7`, then repeat rename on both iPhone and iPad. Keep
-the earlier Release evidence as historical input.
+source, parent, and library-root intents. Runtime `1.0.8` adds a path-free,
+allowlisted diagnostic ID to rejected rename/delete path checks and shows its
+Japanese explanation in the smoke screen. It never displays a document path,
+filename, or PDF data. Build and install `dev-runtime-v1.0.8`, retry rename,
+and record the complete `診断:` line if it still fails. Keep the earlier Release
+evidence as historical input.
 
 Pushing a `dev-runtime-v*` tag alone does not start a native build. Production
 `v*` tags do trigger the production path, so do not create one until the

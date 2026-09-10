@@ -24,6 +24,26 @@ internal enum FlinkFileErrorCode: String {
   case nativeRuntimeMismatch = "E_NATIVE_RUNTIME_MISMATCH"
 }
 
+/// Fixed, non-sensitive diagnostics which may cross the JavaScript bridge.
+/// Never add a URL, path component, filename, resource identifier, or PDF data here.
+internal enum FlinkPathDiagnostic: String {
+  case resolveSourceKind = "path.v1.resolve-source-kind"
+  case relativePathOutsideRoot = "path.v1.relative-path-outside-root"
+  case relativePathInvalidComponent = "path.v1.relative-path-invalid-component"
+  case pathOutsideRoot = "path.v1.path-outside-root"
+  case pathRootSymbolicLink = "path.v1.path-root-symbolic-link"
+  case pathDescendantSymbolicLink = "path.v1.path-descendant-symbolic-link"
+  case coordinatedSourceKind = "path.v1.coordinated-source-kind"
+  case coordinatedLibraryKind = "path.v1.coordinated-library-kind"
+  case coordinatedLibraryIdentity = "path.v1.coordinated-library-identity"
+  case coordinatedParentKind = "path.v1.coordinated-parent-kind"
+  case coordinatedParentIdentity = "path.v1.coordinated-parent-identity"
+  case coordinatedInvalidRelativeComponents = "path.v1.coordinated-invalid-relative-components"
+  case coordinatedPathContainment = "path.v1.coordinated-path-containment"
+  case coordinatedPathSymbolicLink = "path.v1.coordinated-path-symbolic-link"
+  case nonFileIdentityURL = "path.v1.non-file-identity-url"
+}
+
 /// Expo receives a stable code while the reason deliberately omits paths and PDF data.
 internal final class FlinkFilesException: Exception {
   private let flinkCode: FlinkFileErrorCode
@@ -53,13 +73,27 @@ internal final class FlinkFilesException: Exception {
     return parts.joined(separator: ";")
   }
 
+  // Exception inherits JavaScriptThrowable's default `message`, which uses
+  // String(reflecting:) and would otherwise include native source coordinates.
+  // Keep the bridged message exactly equal to the path-free reason above.
+  override var debugDescription: String {
+    reason
+  }
+
   internal static func wrapping(
     _ error: Error,
     operation: String,
     fallback: FlinkFileErrorCode
   ) -> FlinkFilesException {
     if let flinkError = error as? FlinkFilesException {
-      return flinkError
+      // The public operation is the bridge entry point, not a nested helper
+      // such as `pathValidation`. This makes the safe JS parser fail closed
+      // when a diagnostic is associated with a different operation.
+      return FlinkFilesException(
+        flinkError.flinkCode,
+        operation: operation,
+        diagnostic: flinkError.diagnostic
+      )
     }
 
     let cocoaError = error as NSError
@@ -292,12 +326,20 @@ internal enum FlinkPathSafety {
     guard candidateComponents.count > rootComponents.count,
           Array(candidateComponents.prefix(rootComponents.count)) == rootComponents
     else {
-      throw FlinkFilesException(.pathOutsideLibrary, operation: "relativePath")
+      throw FlinkFilesException(
+        .pathOutsideLibrary,
+        operation: "relativePath",
+        diagnostic: FlinkPathDiagnostic.relativePathOutsideRoot.rawValue
+      )
     }
 
     let relativeComponents = candidateComponents.dropFirst(rootComponents.count)
     guard !relativeComponents.contains(".."), !relativeComponents.contains(".") else {
-      throw FlinkFilesException(.pathOutsideLibrary, operation: "relativePath")
+      throw FlinkFilesException(
+        .pathOutsideLibrary,
+        operation: "relativePath",
+        diagnostic: FlinkPathDiagnostic.relativePathInvalidComponent.rawValue
+      )
     }
     return relativeComponents.joined(separator: "/")
   }
@@ -308,7 +350,11 @@ internal enum FlinkPathSafety {
     guard candidateComponents.count >= rootComponents.count,
           Array(candidateComponents.prefix(rootComponents.count)) == rootComponents
     else {
-      throw FlinkFilesException(.pathOutsideLibrary, operation: "pathValidation")
+      throw FlinkFilesException(
+        .pathOutsideLibrary,
+        operation: "pathValidation",
+        diagnostic: FlinkPathDiagnostic.pathOutsideRoot.rawValue
+      )
     }
     // Validate only the app-owned root and descendants. System ancestors (for example
     // `/var` on Apple platforms) may themselves be symlinks and are outside our trust
@@ -316,7 +362,11 @@ internal enum FlinkPathSafety {
     var current = root.standardizedFileURL
     let rootValues = try current.resourceValues(forKeys: [.isSymbolicLinkKey])
     guard rootValues.isSymbolicLink == false else {
-      throw FlinkFilesException(.pathOutsideLibrary, operation: "pathValidation")
+      throw FlinkFilesException(
+        .pathOutsideLibrary,
+        operation: "pathValidation",
+        diagnostic: FlinkPathDiagnostic.pathRootSymbolicLink.rawValue
+      )
     }
 
     for component in candidateComponents.dropFirst(rootComponents.count) {
@@ -325,7 +375,11 @@ internal enum FlinkPathSafety {
         .isSymbolicLinkKey,
       ])
       guard values.isSymbolicLink == false else {
-        throw FlinkFilesException(.pathOutsideLibrary, operation: "pathValidation")
+        throw FlinkFilesException(
+          .pathOutsideLibrary,
+          operation: "pathValidation",
+          diagnostic: FlinkPathDiagnostic.pathDescendantSymbolicLink.rawValue
+        )
       }
     }
   }

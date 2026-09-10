@@ -26,6 +26,7 @@ import {
   FlinkFaceDebugView,
   FlinkNativeError,
   FlinkPDFView,
+  formatNativeErrorForDisplay,
   flinkNative,
   normalizeNativeError,
   type FaceCapabilities,
@@ -51,7 +52,7 @@ function diagnostic(error: unknown, operation: string) {
     error instanceof FlinkNativeError
       ? error
       : normalizeNativeError(error, operation);
-  return `${normalized.code}: ${normalized.message}`;
+  return formatNativeErrorForDisplay(normalized);
 }
 
 function Button({
