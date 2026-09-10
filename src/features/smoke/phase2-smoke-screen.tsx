@@ -655,7 +655,7 @@ function ReaderSmoke({
                 }
               }}
             />
-            <Button label="全体表示" onPress={() => void fit()} />
+            <Button label="ページ全体" onPress={() => void fit()} />
             <Button
               label="次"
               disabled={
@@ -664,6 +664,9 @@ function ReaderSmoke({
               onPress={() => void navigate({ delta: 1 })}
             />
           </View>
+          <Text style={styles.fitHelp}>
+            「ページ全体」は現在の1ページを画面内に収めるズームリセットです。
+          </Text>
         </View>
 
         <ScrollView
@@ -882,6 +885,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     color: colors.ink,
     paddingHorizontal: 9,
+    textAlign: 'center',
+  },
+  fitHelp: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.card,
+    color: colors.secondary,
+    fontSize: 11,
     textAlign: 'center',
   },
   debugScroll: {

@@ -774,12 +774,16 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
   private func isSameFileSystemResource(_ lhs: URL, _ rhs: URL) -> Bool {
     guard let left = try? lhs.resourceValues(forKeys: [.fileResourceIdentifierKey]),
           let right = try? rhs.resourceValues(forKeys: [.fileResourceIdentifierKey]),
-          let leftIdentity = FlinkResourceIdentity.hashed(left.fileResourceIdentifier),
-          let rightIdentity = FlinkResourceIdentity.hashed(right.fileResourceIdentifier)
+          let leftIdentifier = left.fileResourceIdentifier,
+          let rightIdentifier = right.fileResourceIdentifier
     else {
       return false
     }
-    return leftIdentity == rightIdentity
+
+    // File resource identifiers are opaque equality tokens. Their archived
+    // bytes are not a canonical representation; Foundation requires isEqual
+    // so equivalent spellings such as /var and /private/var match by inode.
+    return leftIdentifier.isEqual(rightIdentifier)
   }
 
   private func posixMutationError(_ code: Int32, operation: String) -> FlinkFilesException {

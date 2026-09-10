@@ -140,6 +140,15 @@ describe('Phase 2 native source contract', () => {
     expect(filesTypesSource).not.toContain(
       'candidate.resolvingSymlinksInPath()',
     );
+
+    const identityHelper = filesSource.slice(
+      filesSource.indexOf('private func isSameFileSystemResource('),
+      filesSource.indexOf('private func posixMutationError('),
+    );
+    expect(identityHelper).toContain(
+      'return leftIdentifier.isEqual(rightIdentifier)',
+    );
+    expect(identityHelper).not.toContain('FlinkResourceIdentity.hashed');
   });
 
   it('keeps thumbnail work serial, bounded, cancellable, and pressure-aware', () => {
@@ -157,6 +166,17 @@ describe('Phase 2 native source contract', () => {
     expect(pdfViewSource).toContain('scaleFactorForSizeToFit');
     expect(pdfViewSource).toContain('recentCommandIds');
     expect(pdfViewSource).toContain('FlinkReaderContextBroker.shared');
+    expect(pdfViewSource).not.toContain('.singlePageContinuous');
+    expect(pdfViewSource).toMatch(
+      /func fitCurrentPage[\s\S]*?fitDisplayedPage\(\)/,
+    );
+    expect(pdfViewSource).toMatch(
+      /let fit = pdfView\.scaleFactorForSizeToFit[\s\S]*?pdfView\.scaleFactor = fit/,
+    );
+    expect(smokeScreenSource).toContain('label="ページ全体"');
+    expect(smokeScreenSource).toContain(
+      '現在の1ページを画面内に収めるズームリセットです。',
+    );
   });
 
   it('waits for the mounted native view before opening a PDF', () => {

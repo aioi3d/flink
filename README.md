@@ -25,22 +25,21 @@ npm ci
 npm run verify:local
 ```
 
-The source and recorded installed build now target development runtime
-`1.0.5`. Its Release metadata reproduces the local development signature, so
-`npm run native:check -- --require-resolved` must report `compatible` and infer
-the `development` profile. The production signature remains intentionally
-unrecorded; use `--profile production` only when preparing that runtime.
+The source now targets development runtime `1.0.6`. Its signature and
+installed-build metadata are intentionally unresolved until the replacement
+IPA is built and its Release inputs are recorded. During this transition,
+`npm run native:check -- --profile development` must report `unresolved` with
+no mismatches. The production signature remains intentionally unrecorded.
 
 ## Development IPA status
 
-`dev-runtime-v1.0.4` was the first successfully built IPA, but physical-device
-testing exposed two blockers: coordinated rename rejected an equivalent iOS
-sandbox URL as outside the library, and the first PDF open raced Fabric native
-view registration. Both repairs were compiled and published in development
-runtime `1.0.5`; its downloaded metadata and Pod lock are now recorded locally.
-Re-sign/install the `1.0.5` unsigned IPA, then repeat rename and reader
-navigation on both iPhone and iPad. Keep the `1.0.4` Release evidence as
-historical input rather than treating it as the current installed runtime.
+Runtime `1.0.5` fixed the PDF-view mount race: device testing reached the PDF,
+previous/next navigation, and page-number jumps. Rename still failed because
+the physical-root check archived opaque file identifiers instead of using
+Foundation's equality contract. Runtime `1.0.6` switches that check to
+`isEqual(_:)` while preserving fail-closed containment and symlink checks.
+Build and install `dev-runtime-v1.0.6`, then repeat rename on both iPhone and
+iPad. Keep the earlier Release evidence as historical input.
 
 Pushing a `dev-runtime-v*` tag alone does not start a native build. Production
 `v*` tags do trigger the production path, so do not create one until the
