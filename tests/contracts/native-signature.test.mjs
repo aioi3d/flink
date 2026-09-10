@@ -170,9 +170,19 @@ describe('native runtime signature', () => {
   it('normalizes Podfile.lock line endings and separates build profiles', async () => {
     const root = await makeProject();
     await writeFile(path.join(root, 'native-locks/ios/Podfile.lock'), 'PODS:\n  - Expo\n');
-    const lf = await calculateNativeSignature({ projectRoot: root });
+    const lf = await calculateNativeSignature({
+      projectRoot: root,
+      buildProfile: 'production',
+    });
     await writeFile(path.join(root, 'native-locks/ios/Podfile.lock'), 'PODS:\r\n  - Expo\r\n');
-    expect((await calculateNativeSignature({ projectRoot: root })).signature).toBe(lf.signature);
+    expect(
+      (
+        await calculateNativeSignature({
+          projectRoot: root,
+          buildProfile: 'production',
+        })
+      ).signature,
+    ).toBe(lf.signature);
     expect(
       (await calculateNativeSignature({ projectRoot: root, buildProfile: 'development' }))
         .signature,
