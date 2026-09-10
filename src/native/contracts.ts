@@ -202,6 +202,10 @@ export interface ReaderStateChangedEvent {
   snapshot: ReaderSnapshot;
 }
 
+export interface ReaderViewReadyEvent {
+  ready: true;
+}
+
 export interface PageChangedEvent {
   readerSessionId: ReaderSessionId;
   stateRevision: number;
@@ -216,6 +220,7 @@ export interface ReaderErrorEvent {
 }
 
 export interface FlinkPDFViewEventMap {
+  onViewReady: (event: ReaderViewReadyEvent) => void;
   onReaderStateChanged: (event: ReaderStateChangedEvent) => void;
   onPageChanged: (event: PageChangedEvent) => void;
   onReaderError: (event: ReaderErrorEvent) => void;
@@ -321,6 +326,7 @@ export interface NativeViewEvent<T> {
 }
 
 export interface FlinkPDFViewEventProps {
+  onViewReady?: (event: NativeViewEvent<ReaderViewReadyEvent>) => void;
   onReaderStateChanged?: (
     event: NativeViewEvent<ReaderStateChangedEvent>,
   ) => void;

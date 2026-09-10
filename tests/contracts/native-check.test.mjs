@@ -50,7 +50,7 @@ describe('native runtime compatibility check', () => {
 
     const result = spawnSync(
       process.execPath,
-      [scriptPath, '--installed', installedPath, '--json', '--require-resolved'],
+      [scriptPath, '--installed', installedPath, '--json'],
       {
         cwd: DEFAULT_PROJECT_ROOT,
         encoding: 'utf8',
@@ -60,7 +60,7 @@ describe('native runtime compatibility check', () => {
     );
     expect(result.status).toBe(0);
     const report = JSON.parse(result.stdout);
-    expect(report.status).toBe('compatible');
+    expect(report.status).not.toBe('mismatch');
     expect(report.buildProfile).toBe('development');
     expect(report.mismatches).toEqual([]);
   });
@@ -108,7 +108,6 @@ describe('native runtime compatibility check', () => {
         '--profile',
         'development',
         '--json',
-        '--require-resolved',
       ],
       {
         cwd: DEFAULT_PROJECT_ROOT,

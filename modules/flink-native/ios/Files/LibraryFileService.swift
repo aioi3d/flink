@@ -454,7 +454,10 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
     let destination = resolved.url.deletingLastPathComponent()
       .appendingPathComponent(newName, isDirectory: false)
     let paths = try initializeOnQueue()
-    _ = try FlinkPathSafety.relativePath(of: destination, within: paths.library)
+    let expectedRelativePath = try FlinkPathSafety.relativePath(
+      of: destination,
+      within: paths.library
+    )
     try FlinkPathSafety.assertNoSymbolicLink(
       from: paths.library,
       through: destination.deletingLastPathComponent()
@@ -476,12 +479,40 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       error: &coordinationError
     ) { coordinatedSource, coordinatedDestination in
       do {
-        try self.revalidateResolvedDocument(resolved, coordinatedURL: coordinatedSource)
+        try self.revalidateResolvedDocument(
+          resolved,
+          coordinatedURL: coordinatedSource,
+          configuredLibraryRoot: paths.library,
+          operation: "renameDocument"
+        )
+        let coordinatedDestinationRoot = try self.coordinatedLibraryRoot(
+          for: coordinatedDestination,
+          expectedRelativePath: expectedRelativePath,
+          configuredLibraryRoot: paths.library,
+          operation: "renameDocument"
+        )
+        try FlinkPathSafety.assertNoSymbolicLink(
+          from: coordinatedDestinationRoot,
+          through: coordinatedDestination.deletingLastPathComponent()
+        )
+        try self.rejectRenameConflict(
+          destination: coordinatedDestination,
+          source: coordinatedSource,
+          sourceName: resolved.name
+        )
+        coordinator.item(
+          at: coordinatedSource,
+          willMoveTo: coordinatedDestination
+        )
         try self.atomicRenameNoReplace(
           from: coordinatedSource,
           to: coordinatedDestination,
           allowCaseOnlyAliasOfSource: self.canonicalName(resolved.name)
             == self.canonicalName(newName)
+        )
+        coordinator.item(
+          at: coordinatedSource,
+          didMoveTo: coordinatedDestination
         )
       } catch {
         accessorError = error
@@ -498,14 +529,11 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       throw accessorError
     }
 
-    let expectedRelativePath = try FlinkPathSafety.relativePath(
-      of: destination,
-      within: paths.library
-    )
     forcedRelativePaths.insert(canonicalRelativePath(expectedRelativePath))
     let snapshot = try scanOnQueue()
     guard let renamed = snapshot.entries.first(where: {
-      $0.relativePath == expectedRelativePath
+      canonicalRelativePath($0.relativePath)
+        == canonicalRelativePath(expectedRelativePath)
     }) else {
       throw FlinkFilesException(.fileMissing, operation: "renameDocument")
     }
@@ -515,6 +543,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
 
   private func deleteOnQueue(_ reference: FlinkDocumentReference) throws {
     let resolved = try resolveOnQueue(reference, operation: "deleteDocument")
+    let paths = try initializeOnQueue()
     let coordinator = NSFileCoordinator(filePresenter: nil)
     var coordinationError: NSError?
     var accessorError: Error?
@@ -524,7 +553,12 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       error: &coordinationError
     ) { coordinatedURL in
       do {
-        try self.revalidateResolvedDocument(resolved, coordinatedURL: coordinatedURL)
+        try self.revalidateResolvedDocument(
+          resolved,
+          coordinatedURL: coordinatedURL,
+          configuredLibraryRoot: paths.library,
+          operation: "deleteDocument"
+        )
         try self.fileManager.removeItem(at: coordinatedURL)
       } catch {
         accessorError = error
@@ -572,14 +606,24 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
 
   private func revalidateResolvedDocument(
     _ resolved: FlinkResolvedDocument,
-    coordinatedURL: URL
+    coordinatedURL: URL,
+    configuredLibraryRoot: URL,
+    operation: String
   ) throws {
-    let paths = try initializeOnQueue()
-    try FlinkPathSafety.assertNoSymbolicLink(from: paths.library, through: coordinatedURL)
-    let relativePath = try FlinkPathSafety.relativePath(of: coordinatedURL, within: paths.library)
-    guard relativePath == resolved.relativePath else {
-      throw FlinkFilesException(.fileChanged, operation: "revalidateDocument")
-    }
+    let coordinatedRoot = try coordinatedLibraryRoot(
+      for: coordinatedURL,
+      expectedRelativePath: resolved.relativePath,
+      configuredLibraryRoot: configuredLibraryRoot,
+      operation: operation
+    )
+    try FlinkPathSafety.assertNoSymbolicLink(
+      from: coordinatedRoot,
+      through: coordinatedURL
+    )
+    let relativePath = try FlinkPathSafety.relativePath(
+      of: coordinatedURL,
+      within: coordinatedRoot
+    )
     let values = try coordinatedURL.resourceValues(forKeys: [
       .isRegularFileKey,
       .isSymbolicLinkKey,
@@ -588,7 +632,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       .fileResourceIdentifierKey,
     ])
     guard values.isRegularFile == true, values.isSymbolicLink != true else {
-      throw FlinkFilesException(.pathOutsideLibrary, operation: "revalidateDocument")
+      throw FlinkFilesException(.pathOutsideLibrary, operation: operation)
     }
     let fingerprint = metadataFingerprint(
       relativePath: relativePath,
@@ -599,8 +643,54 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       resourceIdentity: FlinkResourceIdentity.hashed(values.fileResourceIdentifier)
     )
     guard fingerprint == indexedById[resolved.reference.fileId]?.metadataFingerprint else {
-      throw FlinkFilesException(.fileChanged, operation: "revalidateDocument")
+      throw FlinkFilesException(.fileChanged, operation: operation)
     }
+  }
+
+  /// NSFileCoordinator may return an equivalent accessor URL with a different
+  /// spelling for system-owned ancestors (for example `/private/var` versus
+  /// `/var`). Derive that spelling from the trusted relative path, then prove
+  /// that it names the same physical library before accepting the accessor URL.
+  private func coordinatedLibraryRoot(
+    for candidate: URL,
+    expectedRelativePath: String,
+    configuredLibraryRoot: URL,
+    operation: String
+  ) throws -> URL {
+    let relativeComponents = expectedRelativePath.split(
+      separator: "/",
+      omittingEmptySubsequences: false
+    )
+    guard candidate.isFileURL,
+          !relativeComponents.isEmpty,
+          relativeComponents.allSatisfy({
+            !$0.isEmpty && $0 != "." && $0 != ".."
+          }) else {
+      throw FlinkFilesException(.pathOutsideLibrary, operation: operation)
+    }
+
+    let standardizedCandidate = candidate.standardizedFileURL
+    guard standardizedCandidate.pathComponents.count > relativeComponents.count else {
+      throw FlinkFilesException(.pathOutsideLibrary, operation: operation)
+    }
+
+    var coordinatedRoot = standardizedCandidate
+    for _ in relativeComponents {
+      coordinatedRoot.deleteLastPathComponent()
+    }
+    guard isSameFileSystemResource(coordinatedRoot, configuredLibraryRoot) else {
+      throw FlinkFilesException(.pathOutsideLibrary, operation: operation)
+    }
+
+    let actualRelativePath = try FlinkPathSafety.relativePath(
+      of: standardizedCandidate,
+      within: coordinatedRoot
+    )
+    guard canonicalRelativePath(actualRelativePath)
+            == canonicalRelativePath(expectedRelativePath) else {
+      throw FlinkFilesException(.fileChanged, operation: operation)
+    }
+    return coordinatedRoot
   }
 
   private func rejectRenameConflict(
@@ -664,7 +754,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
     }
     let capturedErrno = errno
     if capturedErrno == EEXIST, allowCaseOnlyAliasOfSource,
-       isSameResource(source, destination) {
+       isSameFileSystemResource(source, destination) {
       let caseOnlyResult = source.path.withCString { sourcePath in
         destination.path.withCString { destinationPath in
           rename(sourcePath, destinationPath)
@@ -681,7 +771,7 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
     throw posixMutationError(capturedErrno, operation: "renameDocument")
   }
 
-  private func isSameResource(_ lhs: URL, _ rhs: URL) -> Bool {
+  private func isSameFileSystemResource(_ lhs: URL, _ rhs: URL) -> Bool {
     guard let left = try? lhs.resourceValues(forKeys: [.fileResourceIdentifierKey]),
           let right = try? rhs.resourceValues(forKeys: [.fileResourceIdentifierKey]),
           let leftIdentity = FlinkResourceIdentity.hashed(left.fileResourceIdentifier),

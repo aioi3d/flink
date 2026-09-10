@@ -409,11 +409,14 @@ function ReaderSmoke({
   const [sample, setSample] = useState<FaceSample | null>(null);
   const [tracking, setTracking] = useState(false);
   const [debugVisible, setDebugVisible] = useState(false);
+  const [pdfViewReady, setPdfViewReady] = useState(false);
   const [jumpPage, setJumpPage] = useState('1');
   const [error, setError] = useState<string | null>(null);
   const { width } = useWindowDimensions();
 
   useEffect(() => {
+    if (!pdfViewReady) return;
+
     mountedRef.current = true;
     let effectIsCurrent = true;
     const openRequestId = makeToken('open');
@@ -449,7 +452,7 @@ function ReaderSmoke({
         void view?.closeDocument(openedSessionId).catch(() => undefined);
       }
     };
-  }, [entry]);
+  }, [entry, pdfViewReady]);
 
   useEffect(() => {
     if (!tracking || !epochRef.current) return;
@@ -595,6 +598,7 @@ function ReaderSmoke({
           <FlinkPDFView
             ref={pdfRef}
             style={styles.pdfView}
+            onViewReady={() => setPdfViewReady(true)}
             onReaderStateChanged={({ nativeEvent }) => {
               setSnapshot((current) =>
                 !current || nativeEvent.stateRevision >= current.stateRevision

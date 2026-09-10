@@ -26,11 +26,13 @@ let allSwift;
 let moduleSource;
 let importSource;
 let filesSource;
+let filesTypesSource;
 let thumbnailSource;
 let pdfLoaderSource;
 let pdfViewSource;
 let faceSource;
 let faceDebugSource;
+let smokeScreenSource;
 
 beforeAll(async () => {
   const paths = await swiftFiles(IOS_ROOT);
@@ -39,11 +41,13 @@ beforeAll(async () => {
     moduleSource,
     importSource,
     filesSource,
+    filesTypesSource,
     thumbnailSource,
     pdfLoaderSource,
     pdfViewSource,
     faceSource,
     faceDebugSource,
+    smokeScreenSource,
   ] = await Promise.all([
     Promise.all(paths.map((file) => readFile(file, 'utf8'))).then((values) =>
       values.join('\n'),
@@ -51,11 +55,16 @@ beforeAll(async () => {
     source('FlinkNativeModule.swift'),
     source('Files/FlinkImportCoordinator.swift'),
     source('Files/LibraryFileService.swift'),
+    source('Files/FlinkFilesTypes.swift'),
     source('Files/FlinkThumbnailService.swift'),
     source('PDF/FlinkPDFDocumentLoader.swift'),
     source('PDF/FlinkPDFView.swift'),
     source('Face/FaceSessionCoordinator.swift'),
     source('Face/FlinkFaceDebugView.swift'),
+    readFile(
+      path.join(ROOT, 'src', 'features', 'smoke', 'phase2-smoke-screen.tsx'),
+      'utf8',
+    ),
   ]);
 });
 
@@ -108,6 +117,31 @@ describe('Phase 2 native source contract', () => {
     expect(filesSource).not.toContain('PDFDocument(');
   });
 
+  it('accepts coordinator URL aliases only after proving the physical library root', () => {
+    expect(filesSource).toContain('private func coordinatedLibraryRoot(');
+    expect(filesSource).toContain(
+      'isSameFileSystemResource(coordinatedRoot, configuredLibraryRoot)',
+    );
+    expect(filesSource).toContain(
+      'configuredLibraryRoot: paths.library',
+    );
+    expect(filesSource).toContain(
+      'through: coordinatedDestination.deletingLastPathComponent()',
+    );
+    expect(filesSource).toMatch(
+      /\) \{ coordinatedSource, coordinatedDestination in[\s\S]*?revalidateResolvedDocument\([\s\S]*?coordinatedSource[\s\S]*?coordinatedLibraryRoot\([\s\S]*?coordinatedDestination[\s\S]*?assertNoSymbolicLink[\s\S]*?atomicRenameNoReplace\(/,
+    );
+    expect(filesSource).toMatch(
+      /willMoveTo: coordinatedDestination[\s\S]*?atomicRenameNoReplace\([\s\S]*?didMoveTo: coordinatedDestination/,
+    );
+    expect(filesSource).toMatch(
+      /canonicalRelativePath\(\$0\.relativePath\)\s*== canonicalRelativePath\(expectedRelativePath\)/,
+    );
+    expect(filesTypesSource).not.toContain(
+      'candidate.resolvingSymlinksInPath()',
+    );
+  });
+
   it('keeps thumbnail work serial, bounded, cancellable, and pressure-aware', () => {
     expect(thumbnailSource).toContain('maximumQueuedJobs = 64');
     expect(thumbnailSource).toContain('diskCacheLimit: Int64 = 128 * 1_024 * 1_024');
@@ -123,6 +157,26 @@ describe('Phase 2 native source contract', () => {
     expect(pdfViewSource).toContain('scaleFactorForSizeToFit');
     expect(pdfViewSource).toContain('recentCommandIds');
     expect(pdfViewSource).toContain('FlinkReaderContextBroker.shared');
+  });
+
+  it('waits for the mounted native view before opening a PDF', () => {
+    expect(moduleSource).toMatch(
+      /View\(FlinkPDFView\.self\)[\s\S]*?Events\([\s\S]*?"onViewReady"/,
+    );
+    expect(pdfViewSource).toContain('let onViewReady = EventDispatcher()');
+    expect(pdfViewSource).toMatch(
+      /override func didMoveToWindow\(\)[\s\S]*?window != nil, !didEmitViewReady[\s\S]*?onViewReady\(\["ready": true\]\)/,
+    );
+    expect(smokeScreenSource).toContain(
+      'const [pdfViewReady, setPdfViewReady] = useState(false);',
+    );
+    expect(smokeScreenSource).toMatch(
+      /useEffect\(\(\) => \{\s*if \(!pdfViewReady\) return;[\s\S]*?\.openDocument\(/,
+    );
+    expect(smokeScreenSource).toContain(
+      'onViewReady={() => setPdfViewReady(true)}',
+    );
+    expect(smokeScreenSource).toContain('}, [entry, pdfViewReady]);');
   });
 
   it('owns one explicit ARSession with a bounded pull buffer and watchdog', () => {

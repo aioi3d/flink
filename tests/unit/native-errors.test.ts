@@ -37,4 +37,23 @@ describe('native error normalization', () => {
       recoverable: false,
     });
   });
+
+  it('treats the Expo native-view mount race as recoverable without leaking details', () => {
+    const normalized = normalizeNativeError(
+      Object.assign(new Error('Unable to find view with tag 42'), {
+        code: 'ERR_VIEW_NOT_FOUND',
+      }),
+      'openDocument',
+    );
+
+    expect(normalized).toMatchObject({
+      code: 'ERR_VIEW_NOT_FOUND',
+      operation: 'openDocument',
+      recoverable: true,
+    });
+    expect(normalized.message).toBe(
+      'PDFビューを準備できませんでした。ライブラリへ戻って、もう一度開いてください。',
+    );
+    expect(normalized.message).not.toContain('42');
+  });
 });

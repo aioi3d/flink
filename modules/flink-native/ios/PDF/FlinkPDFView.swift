@@ -6,6 +6,7 @@ import UIKit
 /// open resolves a current DocumentRef through FlinkFilesRuntime first.
 @MainActor
 internal final class FlinkPDFView: ExpoView {
+  let onViewReady = EventDispatcher()
   let onReaderStateChanged = EventDispatcher()
   let onPageChanged = EventDispatcher()
   let onReaderError = EventDispatcher()
@@ -23,6 +24,7 @@ internal final class FlinkPDFView: ExpoView {
   private var ignorePageChangeNotification = false
   private var documentIsValid = false
   private var lifecycleIsSuspended = false
+  private var didEmitViewReady = false
   private var lastLayoutSize = CGSize.zero
   private var loadTickets: [UInt64: FlinkPDFLoadTicket] = [:]
   private var openAbortErrors: [UInt64: FlinkPDFException] = [:]
@@ -86,6 +88,10 @@ internal final class FlinkPDFView: ExpoView {
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
+    if window != nil, !didEmitViewReady {
+      didEmitViewReady = true
+      onViewReady(["ready": true])
+    }
     guard activeSnapshot != nil else {
       return
     }

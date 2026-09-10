@@ -1,14 +1,14 @@
 ---
 document_id: FLINK-IMPLEMENTATION-STATUS
-version: 1.0.4-phase2-ci
+version: 1.0.5-phase2-device-repair
 updated_at: 2026-09-10
 scope: Phase 1 and Phase 2
-status: phase_2_development_ipa_ci_verified_device_unverified
+status: phase_2_device_regressions_repaired_replacement_ipa_pending
 ---
 
 # Flink implementation status
 
-This ledger separates implemented source, local verification, CI verification, and device verification. The `dev-runtime-v1.0.4` workflow completed the Phase 2 development path end to end: it compiled, inspected, packaged, checksum-verified, and published the unsigned IPA and native build inputs. The downloaded Pod lock and build metadata have been verified and recorded locally. No SideStore installation or physical-device result exists yet, so the Phase 2 exit gate is not claimed.
+This ledger separates implemented source, local verification, CI verification, and device verification. The `dev-runtime-v1.0.4` workflow completed the Phase 2 development path end to end and its downloaded Pod lock and build metadata were verified. Physical-device testing then confirmed import, direct Files placement, delete, and on-demand thumbnails, while exposing two blockers: rename returned `E_PATH_OUTSIDE_LIBRARY`, and the first reader open returned Expo's `ERR_VIEW_NOT_FOUND` before PDFKit ran. Runtime `1.0.5` repairs both paths in source; its replacement IPA and device regression results are still pending, so the Phase 2 exit gate is not claimed.
 
 Process exception: before the repository's no-Git inspection constraint had been fully read, Codex ran read-only local `git status`, `git diff`, and `git log` inspection commands. No Git write, checkout, commit, tag, push, remote query, or GitHub operation was performed. Phase 1 evidence, native-signature inputs, and verification scripts do not depend on Git state; no further Git commands were used after the constraint was identified.
 
@@ -41,6 +41,9 @@ Official references checked on 2026-09-10:
 - <https://docs.expo.dev/versions/v57.0.0/>
 - <https://docs.expo.dev/versions/v57.0.0/config/app/>
 - <https://docs.expo.dev/versions/v57.0.0/sdk/dev-client/>
+- <https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/>
+- <https://docs.expo.dev/versions/v57.0.0/sdk/document-picker/>
+- <https://developer.apple.com/documentation/foundation/nsfilecoordinator/coordinate%28writingitemat%3Aoptions%3Awritingitemat%3Aoptions%3Aerror%3Abyaccessor%3A%29>
 - <https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md>
 - <https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28>
 - <https://cli.github.com/manual/gh_release_create>
@@ -71,7 +74,7 @@ The machine-specific Xcode application directory is recorded for the future work
 | P1-06 Typed native API v1 contract | LOCAL_VERIFIED | TypeScript contract, validation, mocks, and explicit unavailable-native behavior passed the aggregate local checks. |
 | P1-07 Pure domain tests | LOCAL_VERIFIED | Blink, library, reader, validation, and stale-response unit coverage passed the aggregate local checks. |
 | P1-08 Static CI foundation | LOCAL_VERIFIED | Linux checks and fail-closed iOS preflight draft added. Static contract tests passed locally. |
-| P1-09 Native signature | CI_VERIFIED | Profile-specific deterministic signatures cover the typed bridge contract, native sources/config, effective iOS assets, actual iOS autolink snapshot, generation tools, and normalized Pod lock. The development signature is resolved and matches run 6 metadata; no generated metadata, Git state, or absolute manifest path is hashed. Production remains intentionally unrecorded. |
+| P1-09 Native signature | CI_VERIFIED | The signature mechanism and the historical 1.0.4 development signature were verified by run 6. Runtime 1.0.5 changes the typed/native inputs, so its development signature is intentionally unrecorded until the replacement CI run; no generated metadata, Git state, or absolute manifest path is hashed. Production remains intentionally unrecorded. |
 | P1-10 Fixture plan and ledger | LOCAL_VERIFIED | Small non-overwriting generator, artificial blink JSON, and preparation notes added. Large/encrypted/realistic inputs remain ungenerated. |
 
 ## Phase 2 task ledger
@@ -83,27 +86,27 @@ The native framework and unsigned IPA boundaries are verified by CI. Runtime beh
 | P2-01 Storage | IMPLEMENTED_UNVERIFIED | `Documents/library`, private Application Support staging, bounded cache roots, owned-partial cleanup, blocked-path handling, and component/symlink root checks are implemented. Files-app visibility and deletion/recreation require a device. |
 | P2-02 Files service | IMPLEMENTED_UNVERIFIED | Recursive metadata-only PDF scan, process-local opaque IDs, revisions, stable scan coalescing, partial warnings, and typed errors are implemented without opening PDFs during scan. External-provider behavior requires devices. |
 | P2-03 Import coordinator | IMPLEMENTED_UNVERIFIED | Multi-select native picker, security scope, coordinated reads, 1 MiB streaming copy, capacity checks, cancellation, owned partial cleanup, atomic no-replace commit, collision suffixes, and partial success are implemented. Provider, 3 GiB, ENOSPC, and race cases require CI/device execution. |
-| P2-04 Mutations and presenters | IMPLEMENTED_UNVERIFIED | Revision-checked coordinated rename/delete, basename validation, case-only handling, library and active-document presenters, debounced invalidation, and writer relinquish are implemented. Deadlock/race behavior requires native execution. |
-| P2-05 PDF view | IMPLEMENTED_UNVERIFIED | URL-backed serialized PDFKit loading, lock/invalid/empty checks, single-page rendering, open supersession, reader sessions, deduplicated navigation, boundaries, page events, fit, lifecycle suspension, and safe teardown are implemented. PDFKit behavior requires CI/device execution. |
+| P2-04 Mutations and presenters | IMPLEMENTED_UNVERIFIED | Device testing confirmed delete but found rename falsely rejecting an equivalent `NSFileCoordinator` accessor URL as outside the library. Runtime 1.0.5 now proves the accessor's derived root is the same physical library, revalidates both coordinated source and destination, preserves component-level symlink rejection, and canonicalizes the post-rename lookup. Replacement-IPA regression is pending. |
+| P2-05 PDF view | IMPLEMENTED_UNVERIFIED | Device testing reached the reader screen but the initial imperative open raced Fabric view registration and failed with `ERR_VIEW_NOT_FOUND` before `FlinkPDFView.openDocument` or PDFKit ran. `FlinkPDFView` now emits a one-shot ready event only after its concrete native view enters a window, and the smoke screen waits for that mount barrier before opening. PDF rendering/navigation/fit remain device-unverified until the regression run succeeds. |
 | P2-06 Thumbnails | IMPLEMENTED_UNVERIFIED | Serial bounded queue, request cancellation/coalescing, page-0 PDFKit rendering, 512 px output, revision cache key, 32 MiB decoded/128 MiB disk limits, reader priority, memory warning, and thermal pause are implemented. Cache and pressure behavior requires devices. |
 | P2-07 Face coordinator | IMPLEMENTED_UNVERIFIED | Runtime capability/authorization checks, one explicit shared ARSession, left/right/jaw coefficients, face identity, 128-sample pull buffer, monotonic timestamps, overflow discard, heartbeat watchdog, lifecycle/interruption, and thermal stops are implemented. ARKit values require both devices. |
 | P2-08 Face debug | IMPLEMENTED_UNVERIFIED | Release-capable opaque white presentation, dark face mesh with white openings, shared session, no camera-frame export, covered ARSCNView, and rendering-off behavior are implemented. The no-camera-frame guarantee must still be visually inspected on both devices. |
-| P2-09 Context and runtime metadata | IMPLEMENTED_UNVERIFIED | Process-local ContextBroker rejects stale/suspended reader, generation, epoch, and sample-time combinations. Run 6 verified the embedded API/runtime/profile/signature/source metadata; broker behavior still requires devices. |
-| P2-10 Native smoke screen | IMPLEMENTED_UNVERIFIED | Minimal iOS screen exercises init/scan/import/cancel/rename/delete/thumbnail, PDF open/navigation/fit, capabilities/permission/start/stop/reset/drain, numeric coefficients, debug face, and runtime metadata. TypeScript/lint checks pass; native interaction requires the development IPA. |
-| P2-11 CI and first IPA | CI_VERIFIED | Workflow run 6 for `dev-runtime-v1.0.4` / source `124d7d5d8593728d04f9b06fdbb098981a9fed60` completed Linux preflight, pinned macOS build, app/IPA inspection, checksum verification, and GitHub Release publication. The resolved development signature is `a04edf0d25d4a23db15348a3c8494b0bde37593b0d6eaa3a0bb762042bb4b4aa`. Same-tag rerun behavior remains tracked separately by TC-D08. |
+| P2-09 Context and runtime metadata | IMPLEMENTED_UNVERIFIED | Process-local ContextBroker rejects stale/suspended reader, generation, epoch, and sample-time combinations. Run 6 verified the embedded 1.0.4 metadata; replacement 1.0.5 metadata is pending, and broker behavior still requires devices. |
+| P2-10 Native smoke screen | IMPLEMENTED_UNVERIFIED | Minimal iOS screen exercises init/scan/import/cancel/rename/delete/thumbnail, PDF open/navigation/fit, capabilities/permission/start/stop/reset/drain, numeric coefficients, debug face, and runtime metadata. Device testing confirmed the file operations listed above and exposed the two repaired blockers; the remaining smoke path requires runtime 1.0.5. |
+| P2-11 CI and first IPA | CI_VERIFIED | Workflow run 6 for `dev-runtime-v1.0.4` / source `124d7d5d8593728d04f9b06fdbb098981a9fed60` completed Linux preflight, pinned macOS build, app/IPA inspection, checksum verification, and GitHub Release publication. It remains valid historical CI evidence, but runtime 1.0.5 now needs its own replacement build before device verification can continue. Same-tag rerun behavior remains tracked separately by TC-D08. |
 
 ## Native runtime state
 
 | Field | Value |
 |---|---|
 | Native API | 1 |
-| Native runtime version | 1.0.4 |
+| Native runtime version | 1.0.5 (replacement build pending) |
 | Algorithm | SHA-256, signature input schema 1 |
-| Recorded installed signature | development: `a04edf0d25d4a23db15348a3c8494b0bde37593b0d6eaa3a0bb762042bb4b4aa`; production: unrecorded |
+| Recorded installed signature | development: unrecorded for 1.0.5; production: unrecorded. The 1.0.4 value remains in its Release metadata. |
 | CocoaPods lock | resolved at `native-locks/ios/Podfile.lock`; SHA-256 `42765a460401c3c0803aeb5e32e1f296a270c75f23a209f49c97f57c8e99ad49` |
-| Installed build metadata | `config/installed-native-build-info.json`; run 6 / attempt 1 / development |
+| Installed build metadata | Pending for 1.0.5; stale 1.0.4 metadata was removed from the canonical comparison path. |
 
-`native:check` infers the installed development profile when no explicit CLI or environment profile is supplied. It returns `compatible`, and `--require-resolved` passes, for the recorded development runtime. Production remains unrecorded and must be checked explicitly when a production runtime is built.
+Until 1.0.5 metadata is recorded, run `native:check -- --profile development`: it must return `unresolved` with no mismatches. `--require-resolved` must fail closed. After the replacement Release inputs are copied into their canonical paths, the plain command may again infer the installed development profile and must return `compatible`. Production remains unrecorded and must be checked explicitly when a production runtime is built.
 
 ## Local evidence recorded so far
 
@@ -135,6 +138,8 @@ The native framework and unsigned IPA boundaries are verified by CI. Runtime beh
 | 2026-09-10 | downloaded Release input verification | `native-build-info.json` and `Podfile.lock` hashes match `SHA256SUMS.txt`; the lock includes local `FlinkNative` and CocoaPods 1.17.0. The IPA is not present in the local handoff directory, so its recorded `8ad49b3f…b5f8` digest remains CI/manifest evidence until the user's downloaded IPA is checked. |
 | 2026-09-10 | development runtime resolution | Release lock and metadata were preserved at their canonical paths. `native-signature --profile development` reproduced `a04edf0d…b4aa` with no unresolved inputs, and `native-check --profile development --require-resolved` returned `compatible`. |
 | 2026-09-10 | post-integration `npm run verify:local` | Passed: typecheck, lint, 11 files / 148 tests, two-profile config, inferred development native compatibility, and TC-D02 / TC-D05–TC-D08 workflow policy. |
+| 2026-09-10 | first physical-device smoke with runtime 1.0.4 | User confirmed picker import, direct Files placement, delete, and explicit thumbnail generation. Rename failed with `E_PATH_OUTSIDE_LIBRARY`; reader open failed with Expo `ERR_VIEW_NOT_FOUND`, so navigation and fit were not reachable. Device model/OS was not supplied, so these are retained as partial observations rather than an iPhone/iPad verification status. |
+| 2026-09-10 | runtime 1.0.5 rename/viewer repair | Added physical-root proof, balanced move notifications, and coordinated destination validation for rename, plus a native mount-ready barrier for initial PDF open. Focused regressions, typecheck, lint, and aggregate local verification passed; 11 files / 151 tests. `native:check --profile development` is intentionally unresolved with zero mismatches until CI metadata is recorded; no provisional signature is recorded as Release evidence. |
 | 2026-09-10 | `expo-modules-autolinking resolve --platform apple --json` | Passed; `flink-native` resolves `FlinkNativeModule` and the `FlinkNative` pod |
 | 2026-09-10 | one-shot `expo export --platform ios` | Passed; the Phase 2 smoke route bundled 1,506 modules without starting a persistent development server |
 | 2026-09-10 | `npm ci` | Passed from `package-lock.json`; 872 packages audited |
@@ -142,7 +147,7 @@ The native framework and unsigned IPA boundaries are verified by CI. Runtime beh
 | 2026-09-10 | `npx expo-doctor` 1.20.4 | Passed all 21 checks |
 | 2026-09-10 | small fixture generator + `pdfinfo` | Generator refused overwrites as designed; the normal and mixed-size synthetic fixtures each parsed as PDF 1.7 with 3 pages |
 
-The 8-file / 114-test aggregate above is the retained Phase 1 baseline. The current aggregate is 11 files / 148 tests after Release input integration and fail-closed profile-inference coverage. Workflow run 6 supplies the macOS build/package/publication evidence; device behavior remains unverified.
+The 8-file / 114-test aggregate above is the retained Phase 1 baseline. The current aggregate is 11 files / 151 tests after Release input integration, fail-closed profile inference, coordinator-alias validation, and native-view readiness coverage. Workflow run 6 supplies historical macOS build/package/publication evidence for 1.0.4; the repaired 1.0.5 native runtime still requires CI and both target devices.
 
 `npm audit --omit=dev` reports 14 moderate advisories in the Expo SDK dependency graph and no high or critical advisories. The offered all-fixes path downgrades core Expo packages across incompatible major versions, so it was not applied. Reassess when an SDK 57-compatible upstream fix is available.
 
@@ -157,7 +162,7 @@ The 8-file / 114-test aggregate above is the retained Phase 1 baseline. The curr
 | TC-D08 | CI_PARTIAL | Run 6 verified the new Draft → upload → remote checksum → publish path. Existing-Release mutable replacement and immutable byte-identical no-op/difference rejection remain contract-tested only until one deliberate same-tag rerun is observed. |
 | TC-D01, TC-D03–TC-D04, TC-D09 | NOT_STARTED | Require the development/production builds, Release assets, and/or physical devices. |
 
-All file, reader, blink-device, UI-device, performance, and security-device tests from TC-F01 through TC-P06 remain NOT_STARTED unless a separate row is added with actual evidence. Pure unit coverage must not be promoted to a device status.
+The partial, device-unspecified observations above do not promote an iPhone or iPad status. Reader, blink, UI, performance, security, and unreported file cases from TC-F01 through TC-P06 remain NOT_STARTED unless a separate row records the target model, OS, runtime, and actual result. Pure unit coverage must not be promoted to a device status.
 
 ## CI workflow boundary
 
@@ -170,7 +175,8 @@ Small PDF fixtures are reproducible but ignored by version control. FIX-05 throu
 ## User decisions and later actions
 
 1. Keep the confirmed `com.aioi.flink` identifier stable from the first development IPA onward. Changing it later may create a different Documents container.
-2. Verify the user's downloaded `Flink-dev-runtime-1.0.4-unsigned.ipa` against SHA-256 `8ad49b3fc2dddfed5f37b3c1feb232b99aa6b0d1304850fcdfc1b09ffa71b5f8` before installation.
-3. Re-sign/install that development IPA and execute the Phase 2 smoke gate separately on both target devices. Provide the device observations and any exact `E_…` error codes before this ledger is promoted to device verified.
-4. After preserving the original run 6 assets, deliberately rerun the same tag once if TC-D08's real existing-Release path is to be promoted from CI_PARTIAL. Do not move the tag or replace it with another commit.
-5. Do not create a production `v*` tag yet. Reserve it until the development CI and device gate succeeds. Keep Apple certificates, provisioning profiles, account passwords, and App Store Connect keys out of this workflow.
+2. Commit and push the 1.0.5 repair, create the existing source tag `dev-runtime-v1.0.5`, then manually run `build-ios-ipa.yml` with profile `development`. A development-tag push alone does not start the workflow.
+3. Verify the new IPA against its own 1.0.5 `SHA256SUMS.txt`, then record that Release's `Podfile.lock` and `native-build-info.json` at the canonical comparison paths before requiring a resolved native check.
+4. Re-sign/install the 1.0.5 IPA and repeat rename plus PDF open/previous/next/number jump/fit separately on both target devices. Include model, OS, and exact error code if any failure remains.
+5. Keep the 1.0.4 Release assets as historical evidence. A same-tag rerun for TC-D08 is optional and separate; never move an existing tag to new source.
+6. Do not create a production `v*` tag yet. Reserve it until the repaired development CI and device gate succeeds. Keep Apple certificates, provisioning profiles, account passwords, and App Store Connect keys out of this workflow.

@@ -28,6 +28,8 @@ const NATIVE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   E_TRACKING_STOPPED: '顔の追跡が停止しています。',
   E_NATIVE_RUNTIME_MISMATCH:
     'インストール済みの開発ランタイムを更新してください。',
+  ERR_VIEW_NOT_FOUND:
+    'PDFビューを準備できませんでした。ライブラリへ戻って、もう一度開いてください。',
 };
 
 const RECOVERABLE_NATIVE_CODES = new Set([
@@ -49,6 +51,7 @@ const RECOVERABLE_NATIVE_CODES = new Set([
   'E_CAMERA_DENIED',
   'E_AR_INTERRUPTED',
   'E_TRACKING_STOPPED',
+  'ERR_VIEW_NOT_FOUND',
 ]);
 
 export class FlinkNativeError extends Error implements FlinkError {

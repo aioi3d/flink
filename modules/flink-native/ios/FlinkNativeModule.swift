@@ -190,6 +190,7 @@ public final class FlinkNativeModule: Module {
 
     View(FlinkPDFView.self) {
       Events(
+        "onViewReady",
         "onReaderStateChanged",
         "onPageChanged",
         "onReaderError"

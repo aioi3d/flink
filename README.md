@@ -25,18 +25,22 @@ npm ci
 npm run verify:local
 ```
 
-The development runtime is pinned to the CI-verified `dev-runtime-v1.0.4`
-inputs. A plain `npm run native:check` now infers the installed development
-profile and must report `compatible`; use `--profile production` only when
-preparing a production runtime.
+The source now targets development runtime `1.0.5`. Its native signature and
+installed-build metadata are intentionally unresolved until the replacement
+IPA is built and its Release inputs are recorded. During this transition,
+`npm run native:check -- --profile development` must report `unresolved` with
+no mismatches. Keep the profile explicit until installed-build metadata is
+recorded; use `--profile production` only when preparing a production runtime.
 
 ## Development IPA status
 
-The `dev-runtime-v1.0.4` workflow completed successfully. Its resolved
-`Podfile.lock`, build metadata, and development signature are recorded in this
-checkout. Next, re-sign/install `Flink-dev-runtime-1.0.4-unsigned.ipa` with
-SideStore or an equivalent tool, then run the smoke checklist on both iPhone
-and iPad and retain the workflow/device log.
+`dev-runtime-v1.0.4` was the first successfully built IPA, but physical-device
+testing exposed two blockers: coordinated rename rejected an equivalent iOS
+sandbox URL as outside the library, and the first PDF open raced Fabric native
+view registration. Both repairs are in runtime `1.0.5`; build
+`dev-runtime-v1.0.5`, re-sign/install its unsigned IPA, then repeat rename and
+reader navigation on both iPhone and iPad. Keep the `1.0.4` Release evidence as
+historical input rather than treating it as the current installed runtime.
 
 Pushing a `dev-runtime-v*` tag alone does not start a native build. Production
 `v*` tags do trigger the production path, so do not create one until the
