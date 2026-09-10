@@ -409,8 +409,16 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
 
     do {
       try validateLibraryRoot(paths.library)
-      try FlinkPathSafety.assertNoSymbolicLink(from: paths.library, through: indexed.url)
-      let values = try indexed.url.resourceValues(forKeys: [
+      // The enumerator's URL is an observation, not an operation capability.
+      // Rebuild the live URL from the checked relative path and the current
+      // app-owned root so equivalent URL spellings cannot fail containment.
+      let sourceComponents = try validatedRelativePathComponents(
+        indexed.relativePath,
+        operation: operation
+      )
+      let source = coordinatedURL(in: paths.library, components: sourceComponents)
+      try FlinkPathSafety.assertNoSymbolicLink(from: paths.library, through: source)
+      let values = try source.resourceValues(forKeys: [
         .isRegularFileKey,
         .isDirectoryKey,
         .isSymbolicLinkKey,
@@ -428,27 +436,26 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
           diagnostic: FlinkPathDiagnostic.resolveSourceKind.rawValue
         )
       }
-      let relativePath = try FlinkPathSafety.relativePath(of: indexed.url, within: paths.library)
       let sizeBytes = Int64(values.fileSize ?? 0)
       let modifiedAtUnixMs = values.contentModificationDate.map {
         $0.timeIntervalSince1970 * 1_000
       }
       let resourceIdentity = FlinkResourceIdentity.hashed(values.fileResourceIdentifier)
       let fingerprint = metadataFingerprint(
-        relativePath: relativePath,
+        relativePath: indexed.relativePath,
         sizeBytes: sizeBytes,
         modifiedAtUnixMs: modifiedAtUnixMs,
         resourceIdentity: resourceIdentity
       )
       guard fingerprint == indexed.metadataFingerprint else {
-        forcedRelativePaths.insert(canonicalRelativePath(relativePath))
+        forcedRelativePaths.insert(canonicalRelativePath(indexed.relativePath))
         throw FlinkFilesException(.fileChanged, operation: operation)
       }
       return FlinkResolvedDocument(
         reference: indexed.reference,
         name: indexed.name,
         relativePath: indexed.relativePath,
-        url: indexed.url,
+        url: source,
         libraryRoot: paths.library,
         sizeBytes: indexed.sizeBytes,
         modifiedAtUnixMs: indexed.modifiedAtUnixMs,
@@ -483,27 +490,33 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
       return resolved.reference
     }
 
-    let sourceParent = resolved.url.deletingLastPathComponent()
+    let paths = try initializeOnQueue()
+    let sourceComponents = try validatedRelativePathComponents(
+      resolved.relativePath,
+      operation: "renameDocument"
+    )
+    let parentComponents = Array(sourceComponents.dropLast())
+    // Derive all preflight paths from the app-owned root and validated path
+    // components. NSFileCoordinator may use a different spelling later, but
+    // that spelling is checked independently inside the accessor.
+    let source = coordinatedURL(in: paths.library, components: sourceComponents)
+    let sourceParent = coordinatedURL(in: paths.library, components: parentComponents)
     let destination = sourceParent
       .appendingPathComponent(newName, isDirectory: false)
-    let paths = try initializeOnQueue()
-    let expectedRelativePath = try FlinkPathSafety.relativePath(
-      of: destination,
-      within: paths.library
-    )
+    let expectedRelativePath = (parentComponents + [newName]).joined(separator: "/")
     try FlinkPathSafety.assertNoSymbolicLink(
       from: paths.library,
       through: sourceParent
     )
     try rejectRenameConflict(
       destination: destination,
-      source: resolved.url,
+      source: source,
       sourceParent: sourceParent,
       sourceName: resolved.name
     )
 
     try coordinateMutation(
-      source: resolved.url,
+      source: source,
       sourceParent: sourceParent,
       libraryRoot: paths.library,
       sourceOptions: .forMoving,
@@ -553,9 +566,18 @@ internal final class FlinkLibraryFileService: @unchecked Sendable {
   private func deleteOnQueue(_ reference: FlinkDocumentReference) throws {
     let resolved = try resolveOnQueue(reference, operation: "deleteDocument")
     let paths = try initializeOnQueue()
+    let sourceComponents = try validatedRelativePathComponents(
+      resolved.relativePath,
+      operation: "deleteDocument"
+    )
+    let source = coordinatedURL(in: paths.library, components: sourceComponents)
+    let sourceParent = coordinatedURL(
+      in: paths.library,
+      components: Array(sourceComponents.dropLast())
+    )
     try coordinateMutation(
-      source: resolved.url,
-      sourceParent: resolved.url.deletingLastPathComponent(),
+      source: source,
+      sourceParent: sourceParent,
       libraryRoot: paths.library,
       sourceOptions: .forDeleting,
       operation: "deleteDocument"

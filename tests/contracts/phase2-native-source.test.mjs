@@ -211,6 +211,48 @@ describe('Phase 2 native source contract', () => {
     expect(identityHelper).not.toContain('FlinkResourceIdentity.hashed');
   });
 
+  it('rebuilds preflight mutation URLs from checked relative components', () => {
+    const resolution = filesSource.slice(
+      filesSource.indexOf('private func resolveOnQueue('),
+      filesSource.indexOf('private func renameOnQueue('),
+    );
+    expect(resolution).toContain(
+      'let sourceComponents = try validatedRelativePathComponents(',
+    );
+    expect(resolution).toContain('indexed.relativePath');
+    expect(resolution).toContain('let source = coordinatedURL(in: paths.library, components: sourceComponents)');
+    expect(resolution).toContain('through: source');
+    expect(resolution).toContain('let values = try source.resourceValues');
+    expect(resolution).toContain('relativePath: indexed.relativePath');
+    expect(resolution).toContain('url: source');
+    expect(resolution).not.toContain('indexed.url.resourceValues');
+    expect(resolution).not.toContain('relativePath(of: indexed.url');
+
+    const rename = filesSource.slice(
+      filesSource.indexOf('private func renameOnQueue('),
+      filesSource.indexOf('private func deleteOnQueue('),
+    );
+    expect(rename).toContain('let parentComponents = Array(sourceComponents.dropLast())');
+    expect(rename).toContain('let source = coordinatedURL(in: paths.library, components: sourceComponents)');
+    expect(rename).toContain('let sourceParent = coordinatedURL(in: paths.library, components: parentComponents)');
+    expect(rename).toContain('(parentComponents + [newName]).joined(separator: "/")');
+    expect(rename).not.toContain('FlinkPathSafety.relativePath(');
+    expect(rename).not.toContain('resolved.url.deletingLastPathComponent()');
+    expect(rename).toMatch(
+      /source: source,[\s\S]*?sourceParent: sourceParent,[\s\S]*?operation: "renameDocument"/,
+    );
+
+    const deletion = filesSource.slice(
+      filesSource.indexOf('private func deleteOnQueue('),
+      filesSource.indexOf('private func validateLibraryRoot('),
+    );
+    expect(deletion).toContain('let source = coordinatedURL(in: paths.library, components: sourceComponents)');
+    expect(deletion).not.toContain('resolved.url.deletingLastPathComponent()');
+    expect(deletion).toMatch(
+      /source: source,[\s\S]*?sourceParent: sourceParent,[\s\S]*?operation: "deleteDocument"/,
+    );
+  });
+
   it('uses fixed, path-free diagnostics for every path-boundary rejection', () => {
     expect(filesTypesSource).toContain('internal enum FlinkPathDiagnostic');
     expect(filesTypesSource).toContain('override var debugDescription');
