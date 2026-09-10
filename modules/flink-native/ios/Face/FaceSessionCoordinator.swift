@@ -254,7 +254,7 @@ internal final class FaceSessionCoordinator: NSObject, ARSessionDelegate {
       )
     }
 
-    try withStateLock {
+    return try withStateLock {
       guard running,
             let context = activeContext,
             let trackingEpoch,

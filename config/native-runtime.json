@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "nativeApiVersion": 1,
-  "nativeRuntimeVersion": "1.0.1",
+  "nativeRuntimeVersion": "1.0.2",
   "signature": {
     "algorithm": "sha256",
     "inputVersion": 1,

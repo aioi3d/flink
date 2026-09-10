@@ -131,6 +131,9 @@ describe('Phase 2 native source contract', () => {
     expect(faceSource).toContain('.eyeBlinkLeft');
     expect(faceSource).toContain('.eyeBlinkRight');
     expect(faceSource).toContain('drainSamples');
+    expect(faceSource).toMatch(
+      /func drainSamples\(trackingEpoch requestedEpoch: String\) throws -> \[String: Any\] \{[\s\S]*?return try withStateLock \{/,
+    );
     expect(faceSource).toContain('runWatchdogLocked');
     expect(faceSource).not.toContain('Data(contentsOf:');
   });
