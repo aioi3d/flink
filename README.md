@@ -25,21 +25,21 @@ npm ci
 npm run verify:local
 ```
 
-The source now targets development runtime `1.0.5`. Its native signature and
-installed-build metadata are intentionally unresolved until the replacement
-IPA is built and its Release inputs are recorded. During this transition,
-`npm run native:check -- --profile development` must report `unresolved` with
-no mismatches. Keep the profile explicit until installed-build metadata is
-recorded; use `--profile production` only when preparing a production runtime.
+The source and recorded installed build now target development runtime
+`1.0.5`. Its Release metadata reproduces the local development signature, so
+`npm run native:check -- --require-resolved` must report `compatible` and infer
+the `development` profile. The production signature remains intentionally
+unrecorded; use `--profile production` only when preparing that runtime.
 
 ## Development IPA status
 
 `dev-runtime-v1.0.4` was the first successfully built IPA, but physical-device
 testing exposed two blockers: coordinated rename rejected an equivalent iOS
 sandbox URL as outside the library, and the first PDF open raced Fabric native
-view registration. Both repairs are in runtime `1.0.5`; build
-`dev-runtime-v1.0.5`, re-sign/install its unsigned IPA, then repeat rename and
-reader navigation on both iPhone and iPad. Keep the `1.0.4` Release evidence as
+view registration. Both repairs were compiled and published in development
+runtime `1.0.5`; its downloaded metadata and Pod lock are now recorded locally.
+Re-sign/install the `1.0.5` unsigned IPA, then repeat rename and reader
+navigation on both iPhone and iPad. Keep the `1.0.4` Release evidence as
 historical input rather than treating it as the current installed runtime.
 
 Pushing a `dev-runtime-v*` tag alone does not start a native build. Production

@@ -7,13 +7,11 @@
     "inputVersion": 1,
     "recordedSignature": null,
     "recordedSignatures": {
-      "development": null,
+      "development": "1983454e6ddbcd9ef947f7af56ea2441655f5deba15d23ef93fd4fe62e9a544f",
       "production": null
     },
-    "resolutionStatus": "unresolved",
-    "unresolvedReasons": [
-      "Development runtime 1.0.5 has not been built and recorded."
-    ]
+    "resolutionStatus": "resolved",
+    "unresolvedReasons": []
   },
   "nativePackageAllowlist": [
     "@expo/cli",
@@ -106,7 +104,7 @@
   "installedBuildInfo": {
     "defaultPath": "config/installed-native-build-info.json",
     "isSignatureInput": false,
-    "status": "pending"
+    "status": "recorded"
   },
   "generatedMetadataBasenames": [
     "native-build-info.json",
